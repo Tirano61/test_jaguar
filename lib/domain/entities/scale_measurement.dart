@@ -14,7 +14,7 @@ class ScaleMeasurement {
   final double vbat;
   final int peso;
   final int estBalanza;
-  final int humedad;
+  final double humedad;
   final int sensorInduc;
 
   ScaleMeasurement copyWith({
@@ -23,7 +23,7 @@ class ScaleMeasurement {
     double? vbat,
     int? peso,
     int? estBalanza,
-    int? humedad,
+    double? humedad,
     int? sensorInduc,
   }) {
     return ScaleMeasurement(
@@ -55,7 +55,7 @@ class ScaleMeasurement {
     vbat: 3.9,
     peso: 0,
     estBalanza: 3,
-    humedad: 60,
+    humedad: 10.0,
     sensorInduc: 0,
   );
 

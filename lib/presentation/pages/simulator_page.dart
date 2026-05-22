@@ -77,6 +77,8 @@ class SimulatorPage extends StatelessWidget {
                       weight: state.weight,
                       phase: state.phaseName,
                       sensorInduc: state.sensorInduc,
+                      humidity: state.humidity,
+                      onHumidityChanged: controller.setHumidity,
                     ),
                     const SizedBox(height: 12),
                     _SectionCard(
@@ -107,27 +109,53 @@ class SimulatorPage extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    _SectionCard(
-                      title: 'Identificadores BLE',
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          _kv('Service UUID', state.serviceUuid),
-                          const SizedBox(height: 8),
-                          _kv('Characteristic UUID', state.characteristicUuid),
-                          const SizedBox(height: 8),
-                          _kv('Service WRITE UUID', state.serviceWriteUuid),
-                          const SizedBox(height: 8),
-                          _kv(
-                            'Characteristic WRITE UUID',
-                            state.characteristicWriteUuid,
+                    Card(
+                      child: Theme(
+                        data: Theme.of(context).copyWith(
+                          dividerColor: Colors.transparent,
+                        ),
+                        child: ExpansionTile(
+                          tilePadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 2,
                           ),
-                          const SizedBox(height: 8),
-                          _kv(
-                            'Central activa',
-                            state.connectedDeviceId ?? 'Sin central conectada',
+                          childrenPadding: const EdgeInsets.fromLTRB(
+                            12,
+                            0,
+                            12,
+                            12,
                           ),
-                        ],
+                          title: Text(
+                            'Identificadores BLE',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          children: <Widget>[
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                _kv('Service UUID', state.serviceUuid),
+                                const SizedBox(height: 8),
+                                _kv(
+                                  'Characteristic UUID',
+                                  state.characteristicUuid,
+                                ),
+                                const SizedBox(height: 8),
+                                _kv('Service WRITE UUID', state.serviceWriteUuid),
+                                const SizedBox(height: 8),
+                                _kv(
+                                  'Characteristic WRITE UUID',
+                                  state.characteristicWriteUuid,
+                                ),
+                                const SizedBox(height: 8),
+                                _kv(
+                                  'Central activa',
+                                  state.connectedDeviceId ??
+                                      'Sin central conectada',
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -313,11 +341,15 @@ class _HeroWeightCard extends StatelessWidget {
     required this.weight,
     required this.phase,
     required this.sensorInduc,
+    required this.humidity,
+    required this.onHumidityChanged,
   });
 
   final int weight;
   final String phase;
   final int sensorInduc;
+  final double humidity;
+  final ValueChanged<double> onHumidityChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -365,6 +397,37 @@ class _HeroWeightCard extends StatelessWidget {
               _HeroBadge(label: phase),
               _HeroBadge(label: 'sensorInduc: $sensorInduc'),
             ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Humedad enviada: ${humidity.toStringAsFixed(1)}',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.92),
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              activeTrackColor: Colors.white,
+              inactiveTrackColor: Colors.white.withValues(alpha: 0.26),
+              thumbColor: const Color(0xFF0D5A5D),
+              overlayColor: Colors.white.withValues(alpha: 0.16),
+              valueIndicatorColor: Colors.white,
+              valueIndicatorTextStyle: const TextStyle(
+                color: Color(0xFF0D5A5D),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            child: Slider(
+              min: 0.0,
+              max: 22.0,
+              divisions: 220,
+              value: humidity.clamp(0.0, 22.0),
+              label: humidity.toStringAsFixed(1),
+              onChanged: (double value) {
+                onHumidityChanged(double.parse(value.toStringAsFixed(1)));
+              },
+            ),
           ),
         ],
       ),

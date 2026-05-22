@@ -97,7 +97,7 @@ class SimulationDomainService {
       vbat: 3.9,
       peso: weight,
       estBalanza: 3,
-      humedad: 60,
+      humedad: 10.0,
       sensorInduc: sensorInducForPhase(phase),
     );
   }
