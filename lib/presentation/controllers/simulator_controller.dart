@@ -6,6 +6,7 @@ import 'package:test_jaguar/application/use_cases/observe_simulator_status_use_c
 import 'package:test_jaguar/application/use_cases/start_simulation_use_case.dart';
 import 'package:test_jaguar/application/use_cases/stop_simulation_use_case.dart';
 import 'package:test_jaguar/core/constants/ble_constants.dart';
+import 'package:test_jaguar/domain/value_objects/simulation_phase.dart';
 import 'package:test_jaguar/presentation/state/simulator_view_state.dart';
 
 class SimulatorController extends ChangeNotifier {
@@ -48,8 +49,9 @@ class SimulatorController extends ChangeNotifier {
         bleEnabled: status.bleStatus.adapterEnabled,
         advertising: status.bleStatus.advertising,
         connected: status.bleStatus.connected,
+        connectedDeviceId: status.bleStatus.connectedDeviceId,
         running: status.running,
-        phaseName: status.phase.name,
+        phaseName: status.phase.label,
         weight: status.measurement.peso,
         sensorInduc: status.measurement.sensorInduc,
         lastJson: status.lastJson,
