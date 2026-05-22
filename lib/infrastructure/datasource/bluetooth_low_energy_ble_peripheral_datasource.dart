@@ -327,15 +327,45 @@ class BluetoothLowEnergyBlePeripheralDataSource
 
   String _decodeCommand(Uint8List value) {
     try {
-      final String decoded = utf8.decode(value, allowMalformed: true).trim();
+      final String decoded = utf8.decode(value, allowMalformed: true);
       if (decoded.isNotEmpty) {
-        return decoded;
+        return _escapeControlChars(decoded);
       }
     } catch (_) {
       // Fallback to hex below.
     }
 
     return value.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
+  }
+
+  String _escapeControlChars(String input) {
+    final StringBuffer buffer = StringBuffer();
+    for (final int codeUnit in input.codeUnits) {
+      switch (codeUnit) {
+        case 0x5C:
+          buffer.write(r'\\');
+          break;
+        case 0x0D:
+          buffer.write(r'\r');
+          break;
+        case 0x0A:
+          buffer.write(r'\n');
+          break;
+        case 0x09:
+          buffer.write(r'\t');
+          break;
+        case 0x20:
+          buffer.write(r'\s');
+          break;
+        default:
+          if (codeUnit < 0x20 || codeUnit == 0x7F) {
+            buffer.write('\\x${codeUnit.toRadixString(16).padLeft(2, '0')}');
+          } else {
+            buffer.writeCharCode(codeUnit);
+          }
+      }
+    }
+    return buffer.toString();
   }
 
   Future<int> _safeMaximumNotifyLength(Central central) async {
