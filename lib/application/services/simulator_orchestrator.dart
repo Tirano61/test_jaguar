@@ -119,6 +119,12 @@ class SimulatorOrchestrator {
       logs.add('Central activa: ${next.connectedDeviceId}');
     }
 
+    if (previous.lastReceivedCommand != next.lastReceivedCommand &&
+        next.lastReceivedCommand != null &&
+        next.lastReceivedCommand!.isNotEmpty) {
+      logs.add('Comando recibido: ${next.lastReceivedCommand}');
+    }
+
     return logs;
   }
 

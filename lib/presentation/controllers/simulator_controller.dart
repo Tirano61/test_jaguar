@@ -29,6 +29,8 @@ class SimulatorController extends ChangeNotifier {
   SimulatorViewState _state = SimulatorViewState.initial.copyWith(
     serviceUuid: BleConstants.serviceUuid,
     characteristicUuid: BleConstants.characteristicUuid,
+    serviceWriteUuid: BleConstants.serviceWriteUuid,
+    characteristicWriteUuid: BleConstants.characteristicWriteUuid,
   );
 
   SimulatorViewState get state => _state;
@@ -50,6 +52,7 @@ class SimulatorController extends ChangeNotifier {
         advertising: status.bleStatus.advertising,
         connected: status.bleStatus.connected,
         connectedDeviceId: status.bleStatus.connectedDeviceId,
+        lastReceivedCommand: status.bleStatus.lastReceivedCommand,
         running: status.running,
         phaseName: status.phase.label,
         weight: status.measurement.peso,
