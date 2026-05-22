@@ -1,9 +1,14 @@
+import 'dart:math';
+
+import 'package:bluetooth_low_energy/bluetooth_low_energy.dart';
 import 'package:flutter/material.dart';
 import 'package:test_jaguar/application/services/simulator_orchestrator.dart';
 import 'package:test_jaguar/application/use_cases/observe_simulator_status_use_case.dart';
 import 'package:test_jaguar/application/use_cases/start_simulation_use_case.dart';
 import 'package:test_jaguar/application/use_cases/stop_simulation_use_case.dart';
-import 'package:test_jaguar/infrastructure/datasource/in_memory_ble_peripheral_datasource.dart';
+import 'package:test_jaguar/domain/services/linear_weight_interpolation_service.dart';
+import 'package:test_jaguar/domain/services/simulation_domain_service.dart';
+import 'package:test_jaguar/infrastructure/datasource/bluetooth_low_energy_ble_peripheral_datasource.dart';
 import 'package:test_jaguar/infrastructure/repositories/ble_peripheral_repository_impl.dart';
 import 'package:test_jaguar/infrastructure/repositories/scale_simulation_repository_impl.dart';
 import 'package:test_jaguar/infrastructure/simulator/in_memory_scale_simulator_engine.dart';
@@ -14,13 +19,23 @@ class AppBootstrap {
   AppBootstrap._();
 
   static Future<void> run() async {
-    final InMemoryBlePeripheralDataSource bleDataSource =
-        InMemoryBlePeripheralDataSource();
+    final PeripheralManager peripheralManager = PeripheralManager();
+    final BluetoothLowEnergyBlePeripheralDataSource bleDataSource =
+      BluetoothLowEnergyBlePeripheralDataSource(manager: peripheralManager);
     final BlePeripheralRepositoryImpl bleRepository =
         BlePeripheralRepositoryImpl(bleDataSource);
 
+    final SimulationDomainService simulationDomainService =
+      const SimulationDomainService();
+    final LinearWeightInterpolationService interpolationService =
+      const LinearWeightInterpolationService();
+
     final InMemoryScaleSimulatorEngine simulatorEngine =
-        InMemoryScaleSimulatorEngine();
+      InMemoryScaleSimulatorEngine(
+        domainService: simulationDomainService,
+        interpolationService: interpolationService,
+        random: Random(),
+      );
     final ScaleSimulationRepositoryImpl simulationRepository =
         ScaleSimulationRepositoryImpl(simulatorEngine);
 
