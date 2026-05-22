@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:test_jaguar/application/services/simulator_orchestrator.dart';
 import 'package:test_jaguar/application/use_cases/observe_simulator_status_use_case.dart';
+import 'package:test_jaguar/application/use_cases/set_humidity_use_case.dart';
 import 'package:test_jaguar/application/use_cases/start_simulation_use_case.dart';
 import 'package:test_jaguar/application/use_cases/stop_simulation_use_case.dart';
 import 'package:test_jaguar/domain/services/linear_weight_interpolation_service.dart';
@@ -50,6 +51,7 @@ class AppBootstrap {
       startSimulationUseCase: StartSimulationUseCase(orchestrator),
       stopSimulationUseCase: StopSimulationUseCase(orchestrator),
       observeStatusUseCase: ObserveSimulatorStatusUseCase(orchestrator),
+      setHumidityUseCase: SetHumidityUseCase(orchestrator),
     );
 
     runApp(_AppRoot(

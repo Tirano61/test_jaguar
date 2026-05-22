@@ -9,6 +9,7 @@ class SimulatorViewState {
     required this.phaseName,
     required this.weight,
     required this.sensorInduc,
+    required this.humidity,
     required this.serviceUuid,
     required this.characteristicUuid,
     required this.serviceWriteUuid,
@@ -26,6 +27,7 @@ class SimulatorViewState {
   final String phaseName;
   final int weight;
   final int sensorInduc;
+  final double humidity;
   final String serviceUuid;
   final String characteristicUuid;
   final String serviceWriteUuid;
@@ -43,6 +45,7 @@ class SimulatorViewState {
     phaseName: 'loadedWaiting',
     weight: 0,
     sensorInduc: 0,
+    humidity: 10.0,
     serviceUuid: '',
     characteristicUuid: '',
     serviceWriteUuid: '',
@@ -61,6 +64,7 @@ class SimulatorViewState {
     String? phaseName,
     int? weight,
     int? sensorInduc,
+    double? humidity,
     String? serviceUuid,
     String? characteristicUuid,
     String? serviceWriteUuid,
@@ -78,6 +82,7 @@ class SimulatorViewState {
       phaseName: phaseName ?? this.phaseName,
       weight: weight ?? this.weight,
       sensorInduc: sensorInduc ?? this.sensorInduc,
+      humidity: humidity ?? this.humidity,
       serviceUuid: serviceUuid ?? this.serviceUuid,
       characteristicUuid: characteristicUuid ?? this.characteristicUuid,
       serviceWriteUuid: serviceWriteUuid ?? this.serviceWriteUuid,

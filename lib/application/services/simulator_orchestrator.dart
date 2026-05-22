@@ -25,7 +25,10 @@ class SimulatorOrchestrator {
   final List<StreamSubscription<dynamic>> _subscriptions =
       <StreamSubscription<dynamic>>[];
 
+  double _selectedHumidity = 10.0;
   SimulatorStatusDto _current = SimulatorStatusDto.initial;
+
+  double get selectedHumidity => _selectedHumidity;
 
   Stream<SimulatorStatusDto> watchStatus() => _statusController.stream;
 
@@ -39,6 +42,23 @@ class SimulatorOrchestrator {
     await _simulationRepository.stop();
     await _bleRepository.stopAdvertising();
     _pushLog('Simulacion detenida');
+  }
+
+  Future<void> setHumidity(double value) async {
+    _selectedHumidity = _normalizeHumidity(value);
+    final updatedMeasurement =
+        _current.measurement.copyWith(humedad: _selectedHumidity);
+    final String json =
+        ScalePayloadDto(measurement: updatedMeasurement).toJsonUtf8String();
+
+    try {
+      await _bleRepository.notifyUtf8Json(json);
+    } catch (error) {
+      _pushLog('Error notify BLE: $error');
+    }
+
+    _emit(_current.copyWith(measurement: updatedMeasurement, lastJson: json));
+    _pushLog('Humedad configurada: ${_selectedHumidity.toStringAsFixed(1)}');
   }
 
   Future<void> dispose() async {
@@ -80,16 +100,23 @@ class SimulatorOrchestrator {
 
     _subscriptions.add(
       _simulationRepository.watchMeasurements().listen((measurement) async {
+        final adjustedMeasurement =
+            measurement.copyWith(humedad: _selectedHumidity);
         final String json =
-            ScalePayloadDto(measurement: measurement).toJsonUtf8String();
+            ScalePayloadDto(measurement: adjustedMeasurement).toJsonUtf8String();
         try {
           await _bleRepository.notifyUtf8Json(json);
         } catch (error) {
           _pushLog('Error notify BLE: $error');
         }
-        _emit(_current.copyWith(measurement: measurement, lastJson: json));
+        _emit(_current.copyWith(measurement: adjustedMeasurement, lastJson: json));
       }),
     );
+  }
+
+  double _normalizeHumidity(double value) {
+    final double clamped = value.clamp(0.0, 22.0);
+    return double.parse(clamped.toStringAsFixed(1));
   }
 
   List<String> _logsForBleStatusChange({
