@@ -111,9 +111,21 @@ class SimulatorPage extends StatelessWidget {
                           const SizedBox(height: 8),
                           _kv('Characteristic UUID', state.characteristicUuid),
                           const SizedBox(height: 8),
+                          _kv('Service WRITE UUID', state.serviceWriteUuid),
+                          const SizedBox(height: 8),
+                          _kv(
+                            'Characteristic WRITE UUID',
+                            state.characteristicWriteUuid,
+                          ),
+                          const SizedBox(height: 8),
                           _kv(
                             'Central activa',
                             state.connectedDeviceId ?? 'Sin central conectada',
+                          ),
+                          const SizedBox(height: 8),
+                          _kv(
+                            'Ultimo comando',
+                            state.lastReceivedCommand ?? 'Sin comandos recibidos',
                           ),
                         ],
                       ),

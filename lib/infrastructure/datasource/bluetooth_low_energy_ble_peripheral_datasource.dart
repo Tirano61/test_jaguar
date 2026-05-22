@@ -48,16 +48,29 @@ class BluetoothLowEnergyBlePeripheralDataSource
   BlePeripheralStatus _status = BlePeripheralStatus.initial;
   bool _advertising = false;
   String _lastPayload = '{}';
+  String _lastReceivedCommand = '';
 
   late final GATTCharacteristic _notifyCharacteristic =
       GATTCharacteristic.mutable(
         uuid: UUID.fromString(BleConstants.characteristicUuid),
         properties: <GATTCharacteristicProperty>[
           GATTCharacteristicProperty.read,
-          GATTCharacteristicProperty.write,
-          GATTCharacteristicProperty.writeWithoutResponse,
           GATTCharacteristicProperty.notify,
           GATTCharacteristicProperty.indicate,
+        ],
+        permissions: <GATTCharacteristicPermission>[
+          GATTCharacteristicPermission.read,
+        ],
+        descriptors: <GATTDescriptor>[],
+      );
+
+  late final GATTCharacteristic _commandWriteCharacteristic =
+      GATTCharacteristic.mutable(
+        uuid: UUID.fromString(BleConstants.characteristicWriteUuid),
+        properties: <GATTCharacteristicProperty>[
+          GATTCharacteristicProperty.read,
+          GATTCharacteristicProperty.write,
+          GATTCharacteristicProperty.writeWithoutResponse,
         ],
         permissions: <GATTCharacteristicPermission>[
           GATTCharacteristicPermission.read,
@@ -81,17 +94,27 @@ class BluetoothLowEnergyBlePeripheralDataSource
     await _ensureAuthorizedAndPoweredOn();
 
     await _manager.removeAllServices();
-    final GATTService service = GATTService(
+    final GATTService notifyService = GATTService(
       uuid: UUID.fromString(BleConstants.serviceUuid),
       isPrimary: true,
       includedServices: <GATTService>[],
       characteristics: <GATTCharacteristic>[_notifyCharacteristic],
     );
-    await _manager.addService(service);
+    final GATTService writeService = GATTService(
+      uuid: UUID.fromString(BleConstants.serviceWriteUuid),
+      isPrimary: true,
+      includedServices: <GATTService>[],
+      characteristics: <GATTCharacteristic>[_commandWriteCharacteristic],
+    );
+    await _manager.addService(notifyService);
+    await _manager.addService(writeService);
 
     final Advertisement advertisement = Advertisement(
       name: Platform.isWindows ? null : 'JaguarScaleSim',
-      serviceUUIDs: <UUID>[UUID.fromString(BleConstants.serviceUuid)],
+      serviceUUIDs: <UUID>[
+        UUID.fromString(BleConstants.serviceUuid),
+        UUID.fromString(BleConstants.serviceWriteUuid),
+      ],
       serviceData: <UUID, Uint8List>{},
       manufacturerSpecificData: <ManufacturerSpecificData>[],
     );
@@ -119,6 +142,7 @@ class BluetoothLowEnergyBlePeripheralDataSource
         advertising: false,
         connected: false,
         connectedDeviceId: null,
+        lastReceivedCommand: null,
       ),
     );
   }
@@ -227,36 +251,58 @@ class BluetoothLowEnergyBlePeripheralDataSource
   Future<void> _onCharacteristicReadRequested(
     GATTCharacteristicReadRequestedEventArgs event,
   ) async {
-    if (event.characteristic.uuid.toString().toUpperCase() !=
-        BleConstants.characteristicUuid) {
-      await _manager.respondReadRequestWithError(
+    final String characteristicUuid =
+        event.characteristic.uuid.toString().toUpperCase();
+
+    if (characteristicUuid == BleConstants.characteristicUuid) {
+      final List<int> payload = utf8.encode(_lastPayload);
+      final int offset = event.request.offset;
+      if (offset < 0 || offset > payload.length) {
+        await _manager.respondReadRequestWithError(
+          event.request,
+          error: GATTError.invalidOffset,
+        );
+        return;
+      }
+
+      await _manager.respondReadRequestWithValue(
         event.request,
-        error: GATTError.requestNotSupported,
+        value: Uint8List.fromList(payload.sublist(offset)),
       );
       return;
     }
 
-    final List<int> payload = utf8.encode(_lastPayload);
-    final int offset = event.request.offset;
-    if (offset < 0 || offset > payload.length) {
-      await _manager.respondReadRequestWithError(
+    if (characteristicUuid == BleConstants.characteristicWriteUuid) {
+      final List<int> payload = utf8.encode(_lastReceivedCommand);
+      final int offset = event.request.offset;
+      if (offset < 0 || offset > payload.length) {
+        await _manager.respondReadRequestWithError(
+          event.request,
+          error: GATTError.invalidOffset,
+        );
+        return;
+      }
+
+      await _manager.respondReadRequestWithValue(
         event.request,
-        error: GATTError.invalidOffset,
+        value: Uint8List.fromList(payload.sublist(offset)),
       );
       return;
     }
 
-    await _manager.respondReadRequestWithValue(
+    await _manager.respondReadRequestWithError(
       event.request,
-      value: Uint8List.fromList(payload.sublist(offset)),
+      error: GATTError.requestNotSupported,
     );
   }
 
   Future<void> _onCharacteristicWriteRequested(
     GATTCharacteristicWriteRequestedEventArgs event,
   ) async {
-    if (event.characteristic.uuid.toString().toUpperCase() !=
-        BleConstants.characteristicUuid) {
+    final String characteristicUuid =
+        event.characteristic.uuid.toString().toUpperCase();
+
+    if (characteristicUuid != BleConstants.characteristicWriteUuid) {
       await _manager.respondWriteRequestWithError(
         event.request,
         error: GATTError.requestNotSupported,
@@ -264,7 +310,32 @@ class BluetoothLowEnergyBlePeripheralDataSource
       return;
     }
 
+    final String decoded = _decodeCommand(event.request.value);
+    _lastReceivedCommand = decoded;
+    _emitStatus(_status.copyWith(lastReceivedCommand: decoded));
+
+    if (event.request.offset < 0) {
+      await _manager.respondWriteRequestWithError(
+        event.request,
+        error: GATTError.invalidOffset,
+      );
+      return;
+    }
+
     await _manager.respondWriteRequest(event.request);
+  }
+
+  String _decodeCommand(Uint8List value) {
+    try {
+      final String decoded = utf8.decode(value, allowMalformed: true).trim();
+      if (decoded.isNotEmpty) {
+        return decoded;
+      }
+    } catch (_) {
+      // Fallback to hex below.
+    }
+
+    return value.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
   }
 
   Future<int> _safeMaximumNotifyLength(Central central) async {
