@@ -13,6 +13,11 @@ class SimulatorPage extends StatelessWidget {
       builder: (BuildContext context, Widget? child) {
         final state = controller.state;
         final ColorScheme scheme = Theme.of(context).colorScheme;
+        final List<String> commandLogs = state.logs
+            .where((String line) => line.startsWith('Comando recibido:'))
+            .toList()
+            .reversed
+            .toList();
 
         return Scaffold(
           body: Stack(
@@ -122,11 +127,6 @@ class SimulatorPage extends StatelessWidget {
                             'Central activa',
                             state.connectedDeviceId ?? 'Sin central conectada',
                           ),
-                          const SizedBox(height: 8),
-                          _kv(
-                            'Ultimo comando',
-                            state.lastReceivedCommand ?? 'Sin comandos recibidos',
-                          ),
                         ],
                       ),
                     ),
@@ -176,34 +176,33 @@ class SimulatorPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     _SectionCard(
-                      title: 'Historial BLE',
-                      child: state.logs.isEmpty
-                          ? const Text('Sin eventos por el momento')
-                          : Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: state.logs
-                                  .take(30)
-                                  .map(
-                                    (line) => Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 3,
+                      title: 'Log de comandos recibidos',
+                      child: commandLogs.isEmpty
+                          ? const Text('Sin comandos recibidos por el momento')
+                          : SizedBox(
+                              height: 220,
+                              child: ListView.separated(
+                                itemCount: commandLogs.length,
+                                separatorBuilder: (_, __) => const Divider(
+                                  height: 10,
+                                ),
+                                itemBuilder: (BuildContext context, int index) {
+                                  final String line = commandLogs[index];
+                                  return Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: <Widget>[
+                                      Icon(
+                                        Icons.keyboard_command_key_rounded,
+                                        size: 16,
+                                        color: scheme.primary,
                                       ),
-                                      child: Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: <Widget>[
-                                          Icon(
-                                            Icons.bolt_rounded,
-                                            size: 16,
-                                            color: scheme.primary,
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Expanded(child: Text(line)),
-                                        ],
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
+                                      const SizedBox(width: 6),
+                                      Expanded(child: Text(line)),
+                                    ],
+                                  );
+                                },
+                              ),
                             ),
                     ),
                   ],
