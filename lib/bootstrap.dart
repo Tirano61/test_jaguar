@@ -1,7 +1,9 @@
 import 'dart:math';
+import 'dart:async';
 
 import 'package:bluetooth_low_energy/bluetooth_low_energy.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:test_jaguar/application/services/simulator_orchestrator.dart';
 import 'package:test_jaguar/application/use_cases/observe_simulator_status_use_case.dart';
 import 'package:test_jaguar/application/use_cases/start_simulation_use_case.dart';
@@ -74,20 +76,98 @@ class _AppRoot extends StatefulWidget {
 }
 
 class _AppRootState extends State<_AppRoot> {
+  late final _LifecycleObserver _lifecycleObserver;
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycleObserver = _LifecycleObserver(onResume: _restoreBleIfNeeded);
+    WidgetsBinding.instance.addObserver(_lifecycleObserver);
+  }
+
   @override
   void dispose() {
-    widget.disposeAll();
+    WidgetsBinding.instance.removeObserver(_lifecycleObserver);
+    unawaited(widget.disposeAll());
     super.dispose();
+  }
+
+  Future<void> _restoreBleIfNeeded() async {
+    if (widget.controller.state.running &&
+        !widget.controller.state.advertising) {
+      await widget.controller.startSimulation();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final ColorScheme scheme = ColorScheme.fromSeed(
+      seedColor: const Color(0xFF005B5E),
+      brightness: Brightness.light,
+    );
+
     return MaterialApp(
       title: 'BLE Scale Simulator',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
+        colorScheme: scheme,
+        scaffoldBackgroundColor: const Color(0xFFF2F6F5),
+        textTheme: GoogleFonts.spaceGroteskTextTheme(),
+        appBarTheme: AppBarTheme(
+          backgroundColor: Colors.transparent,
+          foregroundColor: scheme.onSurface,
+          elevation: 0,
+          centerTitle: false,
+          titleTextStyle: GoogleFonts.spaceGrotesk(
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+            color: scheme.onSurface,
+          ),
+        ),
+        cardTheme: CardThemeData(
+          color: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(
+              color: const Color(0xFF005B5E).withValues(alpha: 0.08),
+            ),
+          ),
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFF005B5E),
+            foregroundColor: Colors.white,
+            minimumSize: const Size.fromHeight(50),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFF005B5E),
+            minimumSize: const Size.fromHeight(50),
+            side: const BorderSide(color: Color(0xFF005B5E), width: 1.2),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+        ),
       ),
       home: SimulatorPage(controller: widget.controller),
     );
+  }
+}
+
+class _LifecycleObserver extends WidgetsBindingObserver {
+  _LifecycleObserver({required this.onResume});
+
+  final Future<void> Function() onResume;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(onResume());
+    }
   }
 }
