@@ -17,6 +17,26 @@ class ScaleMeasurement {
   final int humedad;
   final int sensorInduc;
 
+  ScaleMeasurement copyWith({
+    int? tara,
+    int? hold,
+    double? vbat,
+    int? peso,
+    int? estBalanza,
+    int? humedad,
+    int? sensorInduc,
+  }) {
+    return ScaleMeasurement(
+      tara: tara ?? this.tara,
+      hold: hold ?? this.hold,
+      vbat: vbat ?? this.vbat,
+      peso: peso ?? this.peso,
+      estBalanza: estBalanza ?? this.estBalanza,
+      humedad: humedad ?? this.humedad,
+      sensorInduc: sensorInduc ?? this.sensorInduc,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
       'tara': tara,
@@ -38,4 +58,14 @@ class ScaleMeasurement {
     humedad: 60,
     sensorInduc: 0,
   );
+
+  static ScaleMeasurement fromDynamicWeight({
+    required int peso,
+    required int sensorInduc,
+  }) {
+    return baseline.copyWith(
+      peso: peso,
+      sensorInduc: sensorInduc,
+    );
+  }
 }
