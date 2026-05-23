@@ -67,7 +67,7 @@ class SimulatorPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Peripheral/GATT Server para pruebas industriales',
+                      'Peripheral/GATT Server para pruebas',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: const Color(0xFF3A5E56),
                           ),

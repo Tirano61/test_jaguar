@@ -4,6 +4,7 @@ import 'package:test_jaguar/application/dto/scale_payload_dto.dart';
 import 'package:test_jaguar/application/dto/simulator_status_dto.dart';
 import 'package:test_jaguar/core/extensions/stream_subscription_extensions.dart';
 import 'package:test_jaguar/domain/entities/ble_peripheral_status.dart';
+import 'package:test_jaguar/domain/entities/scale_measurement.dart';
 import 'package:test_jaguar/domain/repositories/ble_peripheral_repository.dart';
 import 'package:test_jaguar/domain/repositories/scale_simulation_repository.dart';
 
@@ -25,7 +26,12 @@ class SimulatorOrchestrator {
   final List<StreamSubscription<dynamic>> _subscriptions =
       <StreamSubscription<dynamic>>[];
 
+  static const int _weightHoldTicksAfterSensorChange = 5;
+
   double _selectedHumidity = 10.0;
+  int _lastSensorInduc = SimulatorStatusDto.initial.measurement.sensorInduc;
+  int _weightHoldTicksRemaining = 0;
+  int? _heldWeight;
   SimulatorStatusDto _current = SimulatorStatusDto.initial;
 
   double get selectedHumidity => _selectedHumidity;
@@ -100,8 +106,9 @@ class SimulatorOrchestrator {
 
     _subscriptions.add(
       _simulationRepository.watchMeasurements().listen((measurement) async {
-        final adjustedMeasurement =
-            measurement.copyWith(humedad: _selectedHumidity);
+        final adjustedMeasurement = _withWeightHoldAfterSensorChange(
+          measurement.copyWith(humedad: _selectedHumidity),
+        );
         final String json =
             ScalePayloadDto(measurement: adjustedMeasurement).toJsonUtf8String();
         try {
@@ -117,6 +124,27 @@ class SimulatorOrchestrator {
   double _normalizeHumidity(double value) {
     final double clamped = value.clamp(0.0, 22.0);
     return double.parse(clamped.toStringAsFixed(1));
+  }
+
+  ScaleMeasurement _withWeightHoldAfterSensorChange(
+    ScaleMeasurement measurement,
+  ) {
+    final int previousSensorInduc = _lastSensorInduc;
+    if (measurement.sensorInduc != previousSensorInduc) {
+      _lastSensorInduc = measurement.sensorInduc;
+      _weightHoldTicksRemaining = _weightHoldTicksAfterSensorChange;
+      _heldWeight = _current.measurement.peso;
+      _pushLog(
+        'Cambio sensorInduc $previousSensorInduc -> ${measurement.sensorInduc}: peso congelado 5s',
+      );
+    }
+
+    if (_weightHoldTicksRemaining > 0 && _heldWeight != null) {
+      _weightHoldTicksRemaining -= 1;
+      return measurement.copyWith(peso: _heldWeight);
+    }
+
+    return measurement;
   }
 
   List<String> _logsForBleStatusChange({
