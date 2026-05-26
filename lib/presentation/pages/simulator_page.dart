@@ -74,7 +74,7 @@ class SimulatorPage extends StatelessWidget {
                             color: const Color(0xFF3A5E56),
                           ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 4),
                     _SectionCard(
                       title: 'Protocolo de envio',
                       child: SegmentedButton<SendProtocol>(
@@ -96,7 +96,35 @@ class SimulatorPage extends StatelessWidget {
                         },
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
+                    _SectionCard(
+                      title: 'Estado BLE',
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: <Widget>[
+                          _StateChip(
+                            label: 'BLE',
+                            active: state.bleEnabled,
+                            activeText: 'ON',
+                            inactiveText: 'OFF',
+                          ),
+                          _StateChip(
+                            label: 'Advertising',
+                            active: state.advertising,
+                            activeText: 'ACTIVO',
+                            inactiveText: 'INACTIVO',
+                          ),
+                          _StateChip(
+                            label: 'Conexion',
+                            active: state.connected,
+                            activeText: 'CONECTADO',
+                            inactiveText: 'DESCONECTADO',
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 4),
                     _HeroWeightCard(
                       sendProtocol: state.sendProtocol,
                       weight: state.weight,
@@ -131,35 +159,7 @@ class SimulatorPage extends StatelessWidget {
                         onSensorInducChanged: controller.setManualSensorInduc,
                       ),
                     ],
-                    const SizedBox(height: 8),
-                    _SectionCard(
-                      title: 'Estado BLE',
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: <Widget>[
-                          _StateChip(
-                            label: 'BLE',
-                            active: state.bleEnabled,
-                            activeText: 'ON',
-                            inactiveText: 'OFF',
-                          ),
-                          _StateChip(
-                            label: 'Advertising',
-                            active: state.advertising,
-                            activeText: 'ACTIVO',
-                            inactiveText: 'INACTIVO',
-                          ),
-                          _StateChip(
-                            label: 'Conexion',
-                            active: state.connected,
-                            activeText: 'CONECTADO',
-                            inactiveText: 'DESCONECTADO',
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     Card(
                       child: Theme(
                         data: Theme.of(context).copyWith(
@@ -209,7 +209,7 @@ class SimulatorPage extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     _SectionCard(
                       title: 'Ultimo JSON enviado',
                       child: Container(
@@ -229,7 +229,7 @@ class SimulatorPage extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     Row(
                       children: <Widget>[
                         Expanded(
@@ -253,7 +253,7 @@ class SimulatorPage extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     _SectionCard(
                       title: 'Log de comandos recibidos',
                       child: commandLogs.isEmpty
@@ -451,7 +451,8 @@ class _HeroWeightCard extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: <Widget>[
-              _HeroBadge(label: phase),
+              if (sendProtocol != SendProtocol.manual)
+                _HeroBadge(label: phase),
               _HeroBadge(label: 'sensorInduc: $sensorInduc'),
               _HeroBadge(label: 'estable: $estBalanza'),
               if (weightHoldSecondsRemaining > 0)
@@ -668,23 +669,38 @@ class _ManualCompactControlsRow extends StatelessWidget {
           Expanded(
             child: Row(
               children: <Widget>[
-                const Text('estable'),
+                Text(
+                  'estable',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: DropdownButtonFormField<int>(
                     value: estBalanza.clamp(0, 5),
                     isExpanded: true,
+                    isDense: true,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontSize: 12,
+                        ),
                     decoration: const InputDecoration(
                       isDense: true,
                       border: OutlineInputBorder(),
                       contentPadding:
-                          EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                          EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                     ),
                     items: List<DropdownMenuItem<int>>.generate(
                       6,
                       (int index) => DropdownMenuItem<int>(
                         value: index,
-                        child: Text('$index'),
+                        child: Text(
+                          '$index',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                fontSize: 12,
+                              ),
+                        ),
                       ),
                     ),
                     onChanged: (int? value) {
@@ -860,7 +876,8 @@ class _ManualSliderWithEditableMaxState
               Expanded(
                 child: Text(
                   '${widget.label}: ${widget.valueLabel}',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
                 ),
@@ -873,13 +890,24 @@ class _ManualSliderWithEditableMaxState
                   focusNode: _maxFocusNode,
                   keyboardType: TextInputType.number,
                   textInputAction: TextInputAction.done,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontSize: 12,
+                        height: 1.1,
+                      ),
                   inputFormatters: <TextInputFormatter>[
                     FilteringTextInputFormatter.digitsOnly,
                   ],
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Max',
+                    labelStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontSize: 11,
+                        ),
                     isDense: true,
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
                   ),
                   onSubmitted: (_) => _applyMaxValue(),
                 ),
