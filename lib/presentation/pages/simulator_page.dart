@@ -77,6 +77,8 @@ class SimulatorPage extends StatelessWidget {
                       weight: state.weight,
                       phase: state.phaseName,
                       sensorInduc: state.sensorInduc,
+                      weightHoldSecondsRemaining:
+                          state.weightHoldSecondsRemaining,
                       humidity: state.humidity,
                       onHumidityChanged: controller.setHumidity,
                     ),
@@ -341,6 +343,7 @@ class _HeroWeightCard extends StatelessWidget {
     required this.weight,
     required this.phase,
     required this.sensorInduc,
+    required this.weightHoldSecondsRemaining,
     required this.humidity,
     required this.onHumidityChanged,
   });
@@ -348,6 +351,7 @@ class _HeroWeightCard extends StatelessWidget {
   final int weight;
   final String phase;
   final int sensorInduc;
+  final int weightHoldSecondsRemaining;
   final double humidity;
   final ValueChanged<double> onHumidityChanged;
 
@@ -396,6 +400,10 @@ class _HeroWeightCard extends StatelessWidget {
             children: <Widget>[
               _HeroBadge(label: phase),
               _HeroBadge(label: 'sensorInduc: $sensorInduc'),
+              if (weightHoldSecondsRemaining > 0)
+                _HeroBadge(
+                  label: 'Peso congelado: ${weightHoldSecondsRemaining}s',
+                ),
             ],
           ),
           const SizedBox(height: 12),
