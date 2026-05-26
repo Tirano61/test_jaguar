@@ -7,6 +7,7 @@ import 'package:test_jaguar/domain/entities/ble_peripheral_status.dart';
 import 'package:test_jaguar/domain/entities/scale_measurement.dart';
 import 'package:test_jaguar/domain/repositories/ble_peripheral_repository.dart';
 import 'package:test_jaguar/domain/repositories/scale_simulation_repository.dart';
+import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
 
 class SimulatorOrchestrator {
   SimulatorOrchestrator({
@@ -28,7 +29,9 @@ class SimulatorOrchestrator {
 
   static const int _weightHoldTicksAfterSensorChange = 5;
 
+  SendProtocol _sendProtocol = SendProtocol.jaguarBle;
   double _selectedHumidity = 10.0;
+  ScaleMeasurement _manualMeasurement = ScaleMeasurement.baseline;
   int _lastSensorInduc = SimulatorStatusDto.initial.measurement.sensorInduc;
   int _weightHoldTicksRemaining = 0;
   int? _heldWeight;
@@ -48,6 +51,29 @@ class SimulatorOrchestrator {
     await _simulationRepository.stop();
     await _bleRepository.stopAdvertising();
     _pushLog('Simulacion detenida');
+  }
+
+  Future<void> setSendProtocol(SendProtocol protocol) async {
+    if (_sendProtocol == protocol) {
+      return;
+    }
+    _sendProtocol = protocol;
+    _weightHoldTicksRemaining = 0;
+    _heldWeight = null;
+    _lastSensorInduc = _current.measurement.sensorInduc;
+
+    _emit(_current.copyWith(sendProtocol: _sendProtocol));
+    _pushLog('Protocolo seleccionado: ${protocol.label}');
+    await _sendCurrentPayloadNow();
+  }
+
+  Future<void> setManualMeasurement(ScaleMeasurement measurement) async {
+    _manualMeasurement = _normalizeManualMeasurement(measurement);
+    _emit(_current.copyWith(manualMeasurement: _manualMeasurement));
+
+    if (_sendProtocol == SendProtocol.manual) {
+      await _sendCurrentPayloadNow();
+    }
   }
 
   Future<void> setHumidity(double value) async {
@@ -106,32 +132,84 @@ class SimulatorOrchestrator {
 
     _subscriptions.add(
       _simulationRepository.watchMeasurements().listen((measurement) async {
-        final adjustedMeasurement = _withScaleStateFromWeightChange(
-          _withWeightHoldAfterSensorChange(
-            measurement.copyWith(humedad: _selectedHumidity),
-          ),
-        );
-        final String json =
-            ScalePayloadDto(measurement: adjustedMeasurement).toJsonUtf8String();
-        try {
-          await _bleRepository.notifyUtf8Json(json);
-        } catch (error) {
-          _pushLog('Error notify BLE: $error');
-        }
-        _emit(
-          _current.copyWith(
-            measurement: adjustedMeasurement,
-            weightHoldSecondsRemaining: _weightHoldTicksRemaining,
-            lastJson: json,
-          ),
+        final ScaleMeasurement outgoingMeasurement =
+            _measurementForCurrentProtocol(measurement);
+        await _notifyAndEmitMeasurement(
+          outgoingMeasurement,
+          weightHoldSecondsRemaining:
+              _sendProtocol == SendProtocol.manual
+                  ? 0
+                  : _weightHoldTicksRemaining,
         );
       }),
+    );
+  }
+
+  Future<void> _sendCurrentPayloadNow() async {
+    final ScaleMeasurement measurement = _sendProtocol == SendProtocol.manual
+        ? _manualMeasurement
+        : _current.measurement.copyWith(humedad: _selectedHumidity);
+    await _notifyAndEmitMeasurement(
+      measurement,
+      weightHoldSecondsRemaining:
+          _sendProtocol == SendProtocol.manual ? 0 : _weightHoldTicksRemaining,
+    );
+  }
+
+  Future<void> _notifyAndEmitMeasurement(
+    ScaleMeasurement measurement, {
+    required int weightHoldSecondsRemaining,
+  }) async {
+    final String json = ScalePayloadDto(measurement: measurement).toJsonUtf8String();
+    try {
+      await _bleRepository.notifyUtf8Json(json);
+    } catch (error) {
+      _pushLog('Error notify BLE: $error');
+    }
+
+    _emit(
+      _current.copyWith(
+        measurement: measurement,
+        sendProtocol: _sendProtocol,
+        manualMeasurement: _manualMeasurement,
+        weightHoldSecondsRemaining: weightHoldSecondsRemaining,
+        lastJson: json,
+      ),
+    );
+  }
+
+  ScaleMeasurement _measurementForCurrentProtocol(ScaleMeasurement measurement) {
+    if (_sendProtocol == SendProtocol.manual) {
+      return _manualMeasurement;
+    }
+
+    return _withScaleStateFromWeightChange(
+      _withWeightHoldAfterSensorChange(
+        measurement.copyWith(humedad: _selectedHumidity),
+      ),
     );
   }
 
   double _normalizeHumidity(double value) {
     final double clamped = value.clamp(0.0, 22.0);
     return double.parse(clamped.toStringAsFixed(1));
+  }
+
+  ScaleMeasurement _normalizeManualMeasurement(ScaleMeasurement measurement) {
+    final double normalizedHumidity =
+        double.parse(measurement.humedad.clamp(0.0, 22.0).toStringAsFixed(1));
+    final double normalizedVbat =
+        double.parse(measurement.vbat.clamp(0.0, 5.0).toStringAsFixed(1));
+
+    return measurement.copyWith(
+      tara: measurement.tara.clamp(0, 99),
+      hold: measurement.hold.clamp(0, 1),
+      vbat: normalizedVbat,
+      peso: measurement.peso.clamp(0, 22000),
+      estBalanza: measurement.estBalanza.clamp(0, 5),
+      humedad: normalizedHumidity,
+      sensorInduc: measurement.sensorInduc.clamp(0, 1),
+    );
   }
 
   ScaleMeasurement _withWeightHoldAfterSensorChange(
