@@ -202,7 +202,7 @@ class SimulatorOrchestrator {
         double.parse(measurement.vbat.clamp(0.0, 5.0).toStringAsFixed(1));
 
     return measurement.copyWith(
-      tara: measurement.tara.clamp(0, 99),
+      tara: measurement.tara.clamp(0, 22000),
       hold: measurement.hold.clamp(0, 1),
       vbat: normalizedVbat,
       peso: measurement.peso.clamp(0, 22000),

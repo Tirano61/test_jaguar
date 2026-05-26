@@ -50,7 +50,7 @@ class ScaleMeasurement {
   }
 
   static const ScaleMeasurement baseline = ScaleMeasurement(
-    tara: 12,
+    tara: 0,
     hold: 1,
     vbat: 3.9,
     peso: 0,

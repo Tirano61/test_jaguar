@@ -55,30 +55,42 @@ class SimulatorController extends ChangeNotifier {
 
   Future<void> setHumidity(double value) => _setHumidityUseCase(value);
 
-    Future<void> selectSendProtocol(SendProtocol protocol) =>
+  Future<void> selectSendProtocol(SendProtocol protocol) =>
       _setSendProtocolUseCase(protocol);
 
-    Future<void> setManualTara(double value) =>
-      _updateManualMeasurement(tara: value.round().clamp(0, 99));
+  Future<void> setManualTara(double value) =>
+      _updateManualMeasurement(tara: value.round().clamp(0, 22000));
 
-    Future<void> setManualHold(double value) =>
+  Future<void> setManualTaraMax(double value) {
+    _state = _state.copyWith(manualTaraMax: value.round().clamp(1, 22000));
+    notifyListeners();
+    return Future<void>.value();
+  }
+
+  Future<void> setManualHold(double value) =>
       _updateManualMeasurement(hold: value.round().clamp(0, 1));
 
-    Future<void> setManualVbat(double value) => _updateManualMeasurement(
+  Future<void> setManualVbat(double value) => _updateManualMeasurement(
       vbat: double.parse(value.clamp(0.0, 5.0).toStringAsFixed(1)),
-      );
+    );
 
-    Future<void> setManualWeight(double value) =>
+  Future<void> setManualWeight(double value) =>
       _updateManualMeasurement(weight: value.round().clamp(0, 22000));
 
-    Future<void> setManualEstBalanza(double value) =>
+  Future<void> setManualWeightMax(double value) {
+    _state = _state.copyWith(manualWeightMax: value.round().clamp(1, 22000));
+    notifyListeners();
+    return Future<void>.value();
+  }
+
+  Future<void> setManualEstBalanza(double value) =>
       _updateManualMeasurement(estBalanza: value.round().clamp(0, 5));
 
-    Future<void> setManualHumidity(double value) => _updateManualMeasurement(
+  Future<void> setManualHumidity(double value) => _updateManualMeasurement(
       humidity: double.parse(value.clamp(0.0, 22.0).toStringAsFixed(1)),
-      );
+    );
 
-    Future<void> setManualSensorInduc(double value) =>
+  Future<void> setManualSensorInduc(double value) =>
       _updateManualMeasurement(sensorInduc: value.round().clamp(0, 1));
 
   @override
