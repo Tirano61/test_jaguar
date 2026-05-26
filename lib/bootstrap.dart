@@ -7,6 +7,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:test_jaguar/application/services/simulator_orchestrator.dart';
 import 'package:test_jaguar/application/use_cases/observe_simulator_status_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_humidity_use_case.dart';
+import 'package:test_jaguar/application/use_cases/set_manual_measurement_use_case.dart';
+import 'package:test_jaguar/application/use_cases/set_send_protocol_use_case.dart';
 import 'package:test_jaguar/application/use_cases/start_simulation_use_case.dart';
 import 'package:test_jaguar/application/use_cases/stop_simulation_use_case.dart';
 import 'package:test_jaguar/domain/services/linear_weight_interpolation_service.dart';
@@ -52,6 +54,8 @@ class AppBootstrap {
       stopSimulationUseCase: StopSimulationUseCase(orchestrator),
       observeStatusUseCase: ObserveSimulatorStatusUseCase(orchestrator),
       setHumidityUseCase: SetHumidityUseCase(orchestrator),
+      setSendProtocolUseCase: SetSendProtocolUseCase(orchestrator),
+      setManualMeasurementUseCase: SetManualMeasurementUseCase(orchestrator),
     );
 
     runApp(_AppRoot(

@@ -1,3 +1,5 @@
+import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
+
 class SimulatorViewState {
   const SimulatorViewState({
     required this.bleEnabled,
@@ -6,12 +8,20 @@ class SimulatorViewState {
     required this.connectedDeviceId,
     required this.lastReceivedCommand,
     required this.running,
+    required this.sendProtocol,
     required this.phaseName,
     required this.weight,
     required this.sensorInduc,
     required this.estBalanza,
     required this.weightHoldSecondsRemaining,
     required this.humidity,
+    required this.manualTara,
+    required this.manualHold,
+    required this.manualVbat,
+    required this.manualWeight,
+    required this.manualEstBalanza,
+    required this.manualHumidity,
+    required this.manualSensorInduc,
     required this.serviceUuid,
     required this.characteristicUuid,
     required this.serviceWriteUuid,
@@ -26,12 +36,20 @@ class SimulatorViewState {
   final String? connectedDeviceId;
   final String? lastReceivedCommand;
   final bool running;
+  final SendProtocol sendProtocol;
   final String phaseName;
   final int weight;
   final int sensorInduc;
   final int estBalanza;
   final int weightHoldSecondsRemaining;
   final double humidity;
+  final int manualTara;
+  final int manualHold;
+  final double manualVbat;
+  final int manualWeight;
+  final int manualEstBalanza;
+  final double manualHumidity;
+  final int manualSensorInduc;
   final String serviceUuid;
   final String characteristicUuid;
   final String serviceWriteUuid;
@@ -46,12 +64,20 @@ class SimulatorViewState {
     connectedDeviceId: null,
     lastReceivedCommand: null,
     running: false,
+    sendProtocol: SendProtocol.jaguarBle,
     phaseName: 'loadedWaiting',
     weight: 0,
     sensorInduc: 0,
     estBalanza: 1,
     weightHoldSecondsRemaining: 0,
     humidity: 10.0,
+    manualTara: 12,
+    manualHold: 1,
+    manualVbat: 3.9,
+    manualWeight: 0,
+    manualEstBalanza: 1,
+    manualHumidity: 10.0,
+    manualSensorInduc: 0,
     serviceUuid: '',
     characteristicUuid: '',
     serviceWriteUuid: '',
@@ -67,12 +93,20 @@ class SimulatorViewState {
     String? connectedDeviceId,
     String? lastReceivedCommand,
     bool? running,
+    SendProtocol? sendProtocol,
     String? phaseName,
     int? weight,
     int? sensorInduc,
     int? estBalanza,
     int? weightHoldSecondsRemaining,
     double? humidity,
+    int? manualTara,
+    int? manualHold,
+    double? manualVbat,
+    int? manualWeight,
+    int? manualEstBalanza,
+    double? manualHumidity,
+    int? manualSensorInduc,
     String? serviceUuid,
     String? characteristicUuid,
     String? serviceWriteUuid,
@@ -87,6 +121,7 @@ class SimulatorViewState {
       connectedDeviceId: connectedDeviceId ?? this.connectedDeviceId,
       lastReceivedCommand: lastReceivedCommand ?? this.lastReceivedCommand,
       running: running ?? this.running,
+        sendProtocol: sendProtocol ?? this.sendProtocol,
       phaseName: phaseName ?? this.phaseName,
       weight: weight ?? this.weight,
       sensorInduc: sensorInduc ?? this.sensorInduc,
@@ -94,6 +129,13 @@ class SimulatorViewState {
       weightHoldSecondsRemaining:
           weightHoldSecondsRemaining ?? this.weightHoldSecondsRemaining,
       humidity: humidity ?? this.humidity,
+        manualTara: manualTara ?? this.manualTara,
+        manualHold: manualHold ?? this.manualHold,
+        manualVbat: manualVbat ?? this.manualVbat,
+        manualWeight: manualWeight ?? this.manualWeight,
+        manualEstBalanza: manualEstBalanza ?? this.manualEstBalanza,
+        manualHumidity: manualHumidity ?? this.manualHumidity,
+        manualSensorInduc: manualSensorInduc ?? this.manualSensorInduc,
       serviceUuid: serviceUuid ?? this.serviceUuid,
       characteristicUuid: characteristicUuid ?? this.characteristicUuid,
       serviceWriteUuid: serviceWriteUuid ?? this.serviceWriteUuid,

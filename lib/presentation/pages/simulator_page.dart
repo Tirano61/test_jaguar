@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
 import 'package:test_jaguar/presentation/controllers/simulator_controller.dart';
 
 class SimulatorPage extends StatelessWidget {
@@ -73,7 +74,30 @@ class SimulatorPage extends StatelessWidget {
                           ),
                     ),
                     const SizedBox(height: 14),
+                    _SectionCard(
+                      title: 'Protocolo de envio',
+                      child: SegmentedButton<SendProtocol>(
+                        segments: SendProtocol.values
+                            .map(
+                              (SendProtocol protocol) =>
+                                  ButtonSegment<SendProtocol>(
+                                value: protocol,
+                                label: Text(protocol.label),
+                              ),
+                            )
+                            .toList(),
+                        selected: <SendProtocol>{state.sendProtocol},
+                        onSelectionChanged: (Set<SendProtocol> selection) {
+                          if (selection.isEmpty) {
+                            return;
+                          }
+                          controller.selectSendProtocol(selection.first);
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 12),
                     _HeroWeightCard(
+                      sendProtocol: state.sendProtocol,
                       weight: state.weight,
                       phase: state.phaseName,
                       sensorInduc: state.sensorInduc,
@@ -83,6 +107,25 @@ class SimulatorPage extends StatelessWidget {
                       humidity: state.humidity,
                       onHumidityChanged: controller.setHumidity,
                     ),
+                    if (state.sendProtocol == SendProtocol.manual) ...<Widget>[
+                      const SizedBox(height: 12),
+                      _ManualPayloadCard(
+                        tara: state.manualTara,
+                        hold: state.manualHold,
+                        vbat: state.manualVbat,
+                        peso: state.manualWeight,
+                        estBalanza: state.manualEstBalanza,
+                        humedad: state.manualHumidity,
+                        sensorInduc: state.manualSensorInduc,
+                        onTaraChanged: controller.setManualTara,
+                        onHoldChanged: controller.setManualHold,
+                        onVbatChanged: controller.setManualVbat,
+                        onPesoChanged: controller.setManualWeight,
+                        onEstBalanzaChanged: controller.setManualEstBalanza,
+                        onHumedadChanged: controller.setManualHumidity,
+                        onSensorInducChanged: controller.setManualSensorInduc,
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     _SectionCard(
                       title: 'Estado BLE',
@@ -341,6 +384,7 @@ class _GlowCircle extends StatelessWidget {
 
 class _HeroWeightCard extends StatelessWidget {
   const _HeroWeightCard({
+    required this.sendProtocol,
     required this.weight,
     required this.phase,
     required this.sensorInduc,
@@ -350,6 +394,7 @@ class _HeroWeightCard extends StatelessWidget {
     required this.onHumidityChanged,
   });
 
+  final SendProtocol sendProtocol;
   final int weight;
   final String phase;
   final int sensorInduc;
@@ -410,36 +455,269 @@ class _HeroWeightCard extends StatelessWidget {
                 ),
             ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            'Humedad enviada: ${humidity.toStringAsFixed(1)}',
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.92),
+          if (sendProtocol == SendProtocol.jaguarBle) ...<Widget>[
+            const SizedBox(height: 12),
+            Text(
+              'Humedad enviada: ${humidity.toStringAsFixed(1)}',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.92),
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+            SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                activeTrackColor: Colors.white,
+                inactiveTrackColor: Colors.white.withValues(alpha: 0.26),
+                thumbColor: const Color(0xFF0D5A5D),
+                overlayColor: Colors.white.withValues(alpha: 0.16),
+                valueIndicatorColor: Colors.white,
+                valueIndicatorTextStyle: const TextStyle(
+                  color: Color(0xFF0D5A5D),
                   fontWeight: FontWeight.w700,
                 ),
-          ),
-          SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              activeTrackColor: Colors.white,
-              inactiveTrackColor: Colors.white.withValues(alpha: 0.26),
-              thumbColor: const Color(0xFF0D5A5D),
-              overlayColor: Colors.white.withValues(alpha: 0.16),
-              valueIndicatorColor: Colors.white,
-              valueIndicatorTextStyle: const TextStyle(
-                color: Color(0xFF0D5A5D),
-                fontWeight: FontWeight.w700,
+              ),
+              child: Slider(
+                min: 0.0,
+                max: 22.0,
+                divisions: 220,
+                value: humidity.clamp(0.0, 22.0),
+                label: humidity.toStringAsFixed(1),
+                onChanged: (double value) {
+                  onHumidityChanged(double.parse(value.toStringAsFixed(1)));
+                },
               ),
             ),
-            child: Slider(
-              min: 0.0,
-              max: 22.0,
-              divisions: 220,
-              value: humidity.clamp(0.0, 22.0),
-              label: humidity.toStringAsFixed(1),
-              onChanged: (double value) {
-                onHumidityChanged(double.parse(value.toStringAsFixed(1)));
-              },
+          ] else ...<Widget>[
+            const SizedBox(height: 12),
+            Text(
+              'Modo manual activo: el JSON se envia con los valores definidos abajo.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.90),
+                  ),
             ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ManualPayloadCard extends StatelessWidget {
+  const _ManualPayloadCard({
+    required this.tara,
+    required this.hold,
+    required this.vbat,
+    required this.peso,
+    required this.estBalanza,
+    required this.humedad,
+    required this.sensorInduc,
+    required this.onTaraChanged,
+    required this.onHoldChanged,
+    required this.onVbatChanged,
+    required this.onPesoChanged,
+    required this.onEstBalanzaChanged,
+    required this.onHumedadChanged,
+    required this.onSensorInducChanged,
+  });
+
+  final int tara;
+  final int hold;
+  final double vbat;
+  final int peso;
+  final int estBalanza;
+  final double humedad;
+  final int sensorInduc;
+
+  final ValueChanged<double> onTaraChanged;
+  final ValueChanged<double> onHoldChanged;
+  final ValueChanged<double> onVbatChanged;
+  final ValueChanged<double> onPesoChanged;
+  final ValueChanged<double> onEstBalanzaChanged;
+  final ValueChanged<double> onHumedadChanged;
+  final ValueChanged<double> onSensorInducChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SectionCard(
+      title: 'Payload manual',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          _ManualSliderRow(
+            label: 'tara',
+            valueLabel: '$tara',
+            min: 0,
+            max: 99,
+            divisions: 99,
+            value: tara.toDouble(),
+            onChanged: onTaraChanged,
+          ),
+          _ManualCompactControlsRow(
+            hold: hold == 1,
+            sensorInduc: sensorInduc == 1,
+            estBalanza: estBalanza,
+            onHoldChanged: (bool enabled) => onHoldChanged(enabled ? 1.0 : 0.0),
+            onSensorInducChanged: (bool enabled) =>
+                onSensorInducChanged(enabled ? 1.0 : 0.0),
+            onEstBalanzaChanged: (int value) =>
+                onEstBalanzaChanged(value.toDouble()),
+          ),
+          _ManualSliderRow(
+            label: 'vbat',
+            valueLabel: vbat.toStringAsFixed(1),
+            min: 0,
+            max: 5,
+            divisions: 50,
+            value: vbat,
+            onChanged: onVbatChanged,
+          ),
+          _ManualSliderRow(
+            label: 'peso',
+            valueLabel: '$peso',
+            min: 0,
+            max: 22000,
+            divisions: 220,
+            value: peso.toDouble(),
+            onChanged: onPesoChanged,
+          ),
+          _ManualSliderRow(
+            label: 'humedad',
+            valueLabel: humedad.toStringAsFixed(1),
+            min: 0,
+            max: 22,
+            divisions: 220,
+            value: humedad,
+            onChanged: onHumedadChanged,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ManualCompactControlsRow extends StatelessWidget {
+  const _ManualCompactControlsRow({
+    required this.hold,
+    required this.sensorInduc,
+    required this.estBalanza,
+    required this.onHoldChanged,
+    required this.onSensorInducChanged,
+    required this.onEstBalanzaChanged,
+  });
+
+  final bool hold;
+  final bool sensorInduc;
+  final int estBalanza;
+  final ValueChanged<bool> onHoldChanged;
+  final ValueChanged<bool> onSensorInducChanged;
+  final ValueChanged<int> onEstBalanzaChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Row(
+              children: <Widget>[
+                const Text('hold'),
+                const SizedBox(width: 4),
+                Switch(
+                  value: hold,
+                  onChanged: onHoldChanged,
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Row(
+              children: <Widget>[
+                const Text('sensorInduc'),
+                const SizedBox(width: 4),
+                Switch(
+                  value: sensorInduc,
+                  onChanged: onSensorInducChanged,
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Row(
+              children: <Widget>[
+                const Text('estable'),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButtonFormField<int>(
+                    value: estBalanza.clamp(0, 5),
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    ),
+                    items: List<DropdownMenuItem<int>>.generate(
+                      6,
+                      (int index) => DropdownMenuItem<int>(
+                        value: index,
+                        child: Text('$index'),
+                      ),
+                    ),
+                    onChanged: (int? value) {
+                      if (value != null) {
+                        onEstBalanzaChanged(value);
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ManualSliderRow extends StatelessWidget {
+  const _ManualSliderRow({
+    required this.label,
+    required this.valueLabel,
+    required this.min,
+    required this.max,
+    required this.divisions,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String valueLabel;
+  final double min;
+  final double max;
+  final int divisions;
+  final double value;
+  final ValueChanged<double> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            '$label: $valueLabel',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+          Slider(
+            min: min,
+            max: max,
+            divisions: divisions,
+            value: value.clamp(min, max),
+            onChanged: onChanged,
           ),
         ],
       ),
