@@ -106,8 +106,10 @@ class SimulatorOrchestrator {
 
     _subscriptions.add(
       _simulationRepository.watchMeasurements().listen((measurement) async {
-        final adjustedMeasurement = _withWeightHoldAfterSensorChange(
-          measurement.copyWith(humedad: _selectedHumidity),
+        final adjustedMeasurement = _withScaleStateFromWeightChange(
+          _withWeightHoldAfterSensorChange(
+            measurement.copyWith(humedad: _selectedHumidity),
+          ),
         );
         final String json =
             ScalePayloadDto(measurement: adjustedMeasurement).toJsonUtf8String();
@@ -151,6 +153,13 @@ class SimulatorOrchestrator {
     }
 
     return measurement;
+  }
+
+  ScaleMeasurement _withScaleStateFromWeightChange(
+    ScaleMeasurement measurement,
+  ) {
+    final bool weightChanged = measurement.peso != _current.measurement.peso;
+    return measurement.copyWith(estBalanza: weightChanged ? 0 : 1);
   }
 
   List<String> _logsForBleStatusChange({
