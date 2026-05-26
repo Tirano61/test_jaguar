@@ -116,7 +116,13 @@ class SimulatorOrchestrator {
         } catch (error) {
           _pushLog('Error notify BLE: $error');
         }
-        _emit(_current.copyWith(measurement: adjustedMeasurement, lastJson: json));
+        _emit(
+          _current.copyWith(
+            measurement: adjustedMeasurement,
+            weightHoldSecondsRemaining: _weightHoldTicksRemaining,
+            lastJson: json,
+          ),
+        );
       }),
     );
   }
