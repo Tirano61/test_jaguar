@@ -67,8 +67,13 @@ class SimulatorController extends ChangeNotifier {
     return Future<void>.value();
   }
 
-  Future<void> setManualHold(double value) =>
-      _updateManualMeasurement(hold: value.round().clamp(0, 1));
+  Future<void> setManualHold(double value) {
+    final int nextHold = value.round().clamp(0, 1);
+    return _updateManualMeasurement(
+      hold: nextHold,
+      estBalanza: nextHold == 1 ? 3 : _state.manualEstBalanza,
+    );
+  }
 
   Future<void> setManualVbat(double value) => _updateManualMeasurement(
       vbat: double.parse(value.clamp(0.0, 5.0).toStringAsFixed(1)),
@@ -83,8 +88,13 @@ class SimulatorController extends ChangeNotifier {
     return Future<void>.value();
   }
 
-  Future<void> setManualEstBalanza(double value) =>
-      _updateManualMeasurement(estBalanza: value.round().clamp(0, 5));
+  Future<void> setManualEstBalanza(double value) {
+    final int nextEstBalanza = value.round().clamp(0, 5);
+    return _updateManualMeasurement(
+      estBalanza: nextEstBalanza,
+      hold: nextEstBalanza == 3 ? 1 : 0,
+    );
+  }
 
   Future<void> setManualHumidity(double value) => _updateManualMeasurement(
       humidity: double.parse(value.clamp(0.0, 22.0).toStringAsFixed(1)),
