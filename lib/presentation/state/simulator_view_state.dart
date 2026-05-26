@@ -9,6 +9,7 @@ class SimulatorViewState {
     required this.phaseName,
     required this.weight,
     required this.sensorInduc,
+    required this.estBalanza,
     required this.weightHoldSecondsRemaining,
     required this.humidity,
     required this.serviceUuid,
@@ -28,6 +29,7 @@ class SimulatorViewState {
   final String phaseName;
   final int weight;
   final int sensorInduc;
+  final int estBalanza;
   final int weightHoldSecondsRemaining;
   final double humidity;
   final String serviceUuid;
@@ -47,6 +49,7 @@ class SimulatorViewState {
     phaseName: 'loadedWaiting',
     weight: 0,
     sensorInduc: 0,
+    estBalanza: 1,
     weightHoldSecondsRemaining: 0,
     humidity: 10.0,
     serviceUuid: '',
@@ -67,6 +70,7 @@ class SimulatorViewState {
     String? phaseName,
     int? weight,
     int? sensorInduc,
+    int? estBalanza,
     int? weightHoldSecondsRemaining,
     double? humidity,
     String? serviceUuid,
@@ -86,7 +90,8 @@ class SimulatorViewState {
       phaseName: phaseName ?? this.phaseName,
       weight: weight ?? this.weight,
       sensorInduc: sensorInduc ?? this.sensorInduc,
-        weightHoldSecondsRemaining:
+      estBalanza: estBalanza ?? this.estBalanza,
+      weightHoldSecondsRemaining:
           weightHoldSecondsRemaining ?? this.weightHoldSecondsRemaining,
       humidity: humidity ?? this.humidity,
       serviceUuid: serviceUuid ?? this.serviceUuid,

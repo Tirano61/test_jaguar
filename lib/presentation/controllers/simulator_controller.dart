@@ -63,6 +63,7 @@ class SimulatorController extends ChangeNotifier {
         phaseName: status.phase.label,
         weight: status.measurement.peso,
         sensorInduc: status.measurement.sensorInduc,
+        estBalanza: status.measurement.estBalanza,
         weightHoldSecondsRemaining: status.weightHoldSecondsRemaining,
         humidity: status.measurement.humedad,
         lastJson: status.lastJson,
