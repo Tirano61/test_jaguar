@@ -28,6 +28,8 @@ class SimulatorOrchestrator {
       <StreamSubscription<dynamic>>[];
 
   static const int _weightHoldTicksAfterSensorChange = 5;
+  static const String _resetHoldCommand = 'AT+RSTHOLD';
+  static const String _toggleTareCommand = 'AT+TARA';
 
   SendProtocol _sendProtocol = SendProtocol.jaguarBle;
   double _selectedHumidity = 10.0;
@@ -102,7 +104,7 @@ class SimulatorOrchestrator {
 
   void _bindSources() {
     _subscriptions.add(
-      _bleRepository.watchStatus().listen((status) {
+      _bleRepository.watchStatus().listen((status) async {
         final List<String> logs = _logsForBleStatusChange(
           previous: _current.bleStatus,
           next: status,
@@ -115,6 +117,8 @@ class SimulatorOrchestrator {
                 : <String>[...logs, ..._current.logs].take(100).toList(),
           ),
         );
+
+        await _applyManualCommandIfNeeded(status.lastReceivedCommand);
       }),
     );
 
@@ -239,6 +243,84 @@ class SimulatorOrchestrator {
     final bool weightChanged = measurement.peso != _current.measurement.peso;
     return measurement.copyWith(estBalanza: weightChanged ? 0 : 1);
   }
+
+  Future<void> _applyManualCommandIfNeeded(String? command) async {
+    if (_sendProtocol != SendProtocol.manual || command == null || command.isEmpty) {
+      return;
+    }
+
+    final String normalizedCommand = _normalizeIncomingCommand(command);
+    if (normalizedCommand.isEmpty) {
+      return;
+    }
+
+    if (_isResetHoldCommand(normalizedCommand)) {
+      final ScaleMeasurement nextManual = _normalizeManualMeasurement(
+        _manualMeasurement.copyWith(
+          hold: 0,
+          estBalanza: 1,
+        ),
+      );
+
+      if (nextManual.hold == _manualMeasurement.hold &&
+          nextManual.estBalanza == _manualMeasurement.estBalanza) {
+        return;
+      }
+
+      _manualMeasurement = nextManual;
+      _emit(_current.copyWith(manualMeasurement: _manualMeasurement));
+      _pushLog('Comando aplicado: AT+RSTHOLD -> hold=0');
+      await _sendCurrentPayloadNow();
+      return;
+    }
+
+    if (_isToggleTareCommand(normalizedCommand)) {
+      final bool activateTare = _manualMeasurement.tara == 0;
+      final ScaleMeasurement toggledMeasurement = activateTare
+          ? _manualMeasurement.copyWith(
+              tara: _manualMeasurement.peso,
+              peso: 0,
+            )
+          : _manualMeasurement.copyWith(
+              tara: 0,
+              peso: (_manualMeasurement.peso + _manualMeasurement.tara)
+                  .clamp(0, 22000)
+                  .toInt(),
+            );
+      final ScaleMeasurement nextManual =
+          _normalizeManualMeasurement(toggledMeasurement);
+
+      if (nextManual.tara == _manualMeasurement.tara &&
+          nextManual.peso == _manualMeasurement.peso) {
+        return;
+      }
+
+      _manualMeasurement = nextManual;
+      _emit(_current.copyWith(manualMeasurement: _manualMeasurement));
+      _pushLog(
+        activateTare
+            ? 'Comando aplicado: AT+TARA -> tara activada'
+            : 'Comando aplicado: AT+TARA -> tara desactivada',
+      );
+      await _sendCurrentPayloadNow();
+    }
+  }
+
+  String _normalizeIncomingCommand(String command) {
+    return command
+        .toUpperCase()
+        .replaceAll(RegExp(r'\\[RNS]'), '')
+        .replaceAll(RegExp(r'\\X[0-9A-F]{2}'), '')
+        .replaceAll(RegExp(r'[\r\n\t\s]'), '')
+        .replaceAll(r'\', '')
+        .trim();
+  }
+
+  bool _isResetHoldCommand(String normalizedCommand) =>
+      normalizedCommand == _resetHoldCommand;
+
+  bool _isToggleTareCommand(String normalizedCommand) =>
+      normalizedCommand == _toggleTareCommand || normalizedCommand == 'TARA';
 
   List<String> _logsForBleStatusChange({
     required BlePeripheralStatus previous,
