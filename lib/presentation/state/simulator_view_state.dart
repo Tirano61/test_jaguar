@@ -16,9 +16,11 @@ class SimulatorViewState {
     required this.weightHoldSecondsRemaining,
     required this.humidity,
     required this.manualTara,
+    required this.manualTaraMax,
     required this.manualHold,
     required this.manualVbat,
     required this.manualWeight,
+    required this.manualWeightMax,
     required this.manualEstBalanza,
     required this.manualHumidity,
     required this.manualSensorInduc,
@@ -44,9 +46,11 @@ class SimulatorViewState {
   final int weightHoldSecondsRemaining;
   final double humidity;
   final int manualTara;
+  final int manualTaraMax;
   final int manualHold;
   final double manualVbat;
   final int manualWeight;
+  final int manualWeightMax;
   final int manualEstBalanza;
   final double manualHumidity;
   final int manualSensorInduc;
@@ -71,10 +75,12 @@ class SimulatorViewState {
     estBalanza: 1,
     weightHoldSecondsRemaining: 0,
     humidity: 10.0,
-    manualTara: 12,
+    manualTara: 0,
+    manualTaraMax: 22000,
     manualHold: 1,
     manualVbat: 3.9,
     manualWeight: 0,
+    manualWeightMax: 22000,
     manualEstBalanza: 1,
     manualHumidity: 10.0,
     manualSensorInduc: 0,
@@ -101,9 +107,11 @@ class SimulatorViewState {
     int? weightHoldSecondsRemaining,
     double? humidity,
     int? manualTara,
+    int? manualTaraMax,
     int? manualHold,
     double? manualVbat,
     int? manualWeight,
+    int? manualWeightMax,
     int? manualEstBalanza,
     double? manualHumidity,
     int? manualSensorInduc,
@@ -129,13 +137,15 @@ class SimulatorViewState {
       weightHoldSecondsRemaining:
           weightHoldSecondsRemaining ?? this.weightHoldSecondsRemaining,
       humidity: humidity ?? this.humidity,
-        manualTara: manualTara ?? this.manualTara,
-        manualHold: manualHold ?? this.manualHold,
-        manualVbat: manualVbat ?? this.manualVbat,
-        manualWeight: manualWeight ?? this.manualWeight,
-        manualEstBalanza: manualEstBalanza ?? this.manualEstBalanza,
-        manualHumidity: manualHumidity ?? this.manualHumidity,
-        manualSensorInduc: manualSensorInduc ?? this.manualSensorInduc,
+      manualTara: manualTara ?? this.manualTara,
+      manualTaraMax: manualTaraMax ?? this.manualTaraMax,
+      manualHold: manualHold ?? this.manualHold,
+      manualVbat: manualVbat ?? this.manualVbat,
+      manualWeight: manualWeight ?? this.manualWeight,
+      manualWeightMax: manualWeightMax ?? this.manualWeightMax,
+      manualEstBalanza: manualEstBalanza ?? this.manualEstBalanza,
+      manualHumidity: manualHumidity ?? this.manualHumidity,
+      manualSensorInduc: manualSensorInduc ?? this.manualSensorInduc,
       serviceUuid: serviceUuid ?? this.serviceUuid,
       characteristicUuid: characteristicUuid ?? this.characteristicUuid,
       serviceWriteUuid: serviceWriteUuid ?? this.serviceWriteUuid,

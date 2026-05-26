@@ -92,7 +92,7 @@ class SimulationDomainService {
     required SimulationPhase phase,
   }) {
     return ScaleMeasurement(
-      tara: 12,
+      tara: 0,
       hold: 1,
       vbat: 3.9,
       peso: weight,

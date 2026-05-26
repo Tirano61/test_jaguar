@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
 import 'package:test_jaguar/presentation/controllers/simulator_controller.dart';
 
@@ -95,7 +96,7 @@ class SimulatorPage extends StatelessWidget {
                         },
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                     _HeroWeightCard(
                       sendProtocol: state.sendProtocol,
                       weight: state.weight,
@@ -108,25 +109,29 @@ class SimulatorPage extends StatelessWidget {
                       onHumidityChanged: controller.setHumidity,
                     ),
                     if (state.sendProtocol == SendProtocol.manual) ...<Widget>[
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
                       _ManualPayloadCard(
                         tara: state.manualTara,
+                        taraMax: state.manualTaraMax,
                         hold: state.manualHold,
                         vbat: state.manualVbat,
                         peso: state.manualWeight,
+                        pesoMax: state.manualWeightMax,
                         estBalanza: state.manualEstBalanza,
                         humedad: state.manualHumidity,
                         sensorInduc: state.manualSensorInduc,
                         onTaraChanged: controller.setManualTara,
+                        onTaraMaxChanged: controller.setManualTaraMax,
                         onHoldChanged: controller.setManualHold,
                         onVbatChanged: controller.setManualVbat,
                         onPesoChanged: controller.setManualWeight,
+                        onPesoMaxChanged: controller.setManualWeightMax,
                         onEstBalanzaChanged: controller.setManualEstBalanza,
                         onHumedadChanged: controller.setManualHumidity,
                         onSensorInducChanged: controller.setManualSensorInduc,
                       ),
                     ],
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                     _SectionCard(
                       title: 'Estado BLE',
                       child: Wrap(
@@ -154,7 +159,7 @@ class SimulatorPage extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                     Card(
                       child: Theme(
                         data: Theme.of(context).copyWith(
@@ -204,7 +209,7 @@ class SimulatorPage extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                     _SectionCard(
                       title: 'Ultimo JSON enviado',
                       child: Container(
@@ -224,7 +229,7 @@ class SimulatorPage extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 8),
                     Row(
                       children: <Widget>[
                         Expanded(
@@ -248,7 +253,7 @@ class SimulatorPage extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 8),
                     _SectionCard(
                       title: 'Log de comandos recibidos',
                       child: commandLogs.isEmpty
@@ -505,33 +510,41 @@ class _HeroWeightCard extends StatelessWidget {
 class _ManualPayloadCard extends StatelessWidget {
   const _ManualPayloadCard({
     required this.tara,
+    required this.taraMax,
     required this.hold,
     required this.vbat,
     required this.peso,
+    required this.pesoMax,
     required this.estBalanza,
     required this.humedad,
     required this.sensorInduc,
     required this.onTaraChanged,
+    required this.onTaraMaxChanged,
     required this.onHoldChanged,
     required this.onVbatChanged,
     required this.onPesoChanged,
+    required this.onPesoMaxChanged,
     required this.onEstBalanzaChanged,
     required this.onHumedadChanged,
     required this.onSensorInducChanged,
   });
 
   final int tara;
+  final int taraMax;
   final int hold;
   final double vbat;
   final int peso;
+  final int pesoMax;
   final int estBalanza;
   final double humedad;
   final int sensorInduc;
 
   final ValueChanged<double> onTaraChanged;
+  final ValueChanged<double> onTaraMaxChanged;
   final ValueChanged<double> onHoldChanged;
   final ValueChanged<double> onVbatChanged;
   final ValueChanged<double> onPesoChanged;
+  final ValueChanged<double> onPesoMaxChanged;
   final ValueChanged<double> onEstBalanzaChanged;
   final ValueChanged<double> onHumedadChanged;
   final ValueChanged<double> onSensorInducChanged;
@@ -543,14 +556,14 @@ class _ManualPayloadCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          _ManualSliderRow(
+          _ManualSliderWithEditableMax(
             label: 'tara',
             valueLabel: '$tara',
-            min: 0,
-            max: 99,
-            divisions: 99,
+            currentMax: taraMax.toDouble(),
+            hardMax: 22000,
             value: tara.toDouble(),
             onChanged: onTaraChanged,
+            onMaxChanged: onTaraMaxChanged,
           ),
           _ManualCompactControlsRow(
             hold: hold == 1,
@@ -562,32 +575,42 @@ class _ManualPayloadCard extends StatelessWidget {
             onEstBalanzaChanged: (int value) =>
                 onEstBalanzaChanged(value.toDouble()),
           ),
-          _ManualSliderRow(
-            label: 'vbat',
-            valueLabel: vbat.toStringAsFixed(1),
-            min: 0,
-            max: 5,
-            divisions: 50,
-            value: vbat,
-            onChanged: onVbatChanged,
-          ),
-          _ManualSliderRow(
+          _ManualSliderWithEditableMax(
             label: 'peso',
             valueLabel: '$peso',
-            min: 0,
-            max: 22000,
-            divisions: 220,
+            currentMax: pesoMax.toDouble(),
+            hardMax: 22000,
             value: peso.toDouble(),
             onChanged: onPesoChanged,
+            onMaxChanged: onPesoMaxChanged,
           ),
-          _ManualSliderRow(
-            label: 'humedad',
-            valueLabel: humedad.toStringAsFixed(1),
-            min: 0,
-            max: 22,
-            divisions: 220,
-            value: humedad,
-            onChanged: onHumedadChanged,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Expanded(
+                child: _ManualSliderRow(
+                  label: 'vbat',
+                  valueLabel: vbat.toStringAsFixed(1),
+                  min: 0,
+                  max: 5,
+                  divisions: 50,
+                  value: vbat,
+                  onChanged: onVbatChanged,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _ManualSliderRow(
+                  label: 'humedad',
+                  valueLabel: humedad.toStringAsFixed(1),
+                  min: 0,
+                  max: 22,
+                  divisions: 220,
+                  value: humedad,
+                  onChanged: onHumedadChanged,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -718,6 +741,157 @@ class _ManualSliderRow extends StatelessWidget {
             divisions: divisions,
             value: value.clamp(min, max),
             onChanged: onChanged,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ManualSliderWithEditableMax extends StatefulWidget {
+  const _ManualSliderWithEditableMax({
+    required this.label,
+    required this.valueLabel,
+    required this.currentMax,
+    required this.hardMax,
+    required this.value,
+    required this.onChanged,
+    required this.onMaxChanged,
+  });
+
+  final String label;
+  final String valueLabel;
+  final double currentMax;
+  final double hardMax;
+  final double value;
+  final ValueChanged<double> onChanged;
+  final ValueChanged<double> onMaxChanged;
+
+  @override
+  State<_ManualSliderWithEditableMax> createState() =>
+      _ManualSliderWithEditableMaxState();
+}
+
+class _ManualSliderWithEditableMaxState
+    extends State<_ManualSliderWithEditableMax> {
+  late final TextEditingController _maxController;
+  late final FocusNode _maxFocusNode;
+  late double _currentMax;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentMax = widget.currentMax.clamp(1, widget.hardMax);
+    _maxController = TextEditingController(
+      text: _currentMax.round().toString(),
+    );
+    _maxFocusNode = FocusNode()..addListener(_handleFocusChange);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ManualSliderWithEditableMax oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final double nextMax = widget.currentMax.clamp(1, widget.hardMax);
+    if (_maxFocusNode.hasFocus || nextMax == _currentMax) {
+      return;
+    }
+
+    _currentMax = nextMax;
+    final String normalizedText = _currentMax.round().toString();
+    _maxController.value = TextEditingValue(
+      text: normalizedText,
+      selection: TextSelection.collapsed(offset: normalizedText.length),
+    );
+  }
+
+  @override
+  void dispose() {
+    _maxFocusNode
+      ..removeListener(_handleFocusChange)
+      ..dispose();
+    _maxController.dispose();
+    super.dispose();
+  }
+
+  void _handleFocusChange() {
+    if (!_maxFocusNode.hasFocus) {
+      _applyMaxValue();
+    }
+  }
+
+  void _applyMaxValue() {
+    final int? parsed = int.tryParse(_maxController.text);
+    final double nextMax = (parsed ?? _currentMax.round())
+        .clamp(1, widget.hardMax.toInt())
+        .toDouble();
+
+    if (nextMax != _currentMax) {
+      setState(() {
+        _currentMax = nextMax;
+      });
+    }
+
+    final String normalizedText = nextMax.round().toString();
+    if (_maxController.text != normalizedText) {
+      _maxController.value = TextEditingValue(
+        text: normalizedText,
+        selection: TextSelection.collapsed(offset: normalizedText.length),
+      );
+    }
+
+    widget.onMaxChanged(nextMax);
+
+    final double clampedValue = widget.value.clamp(0, _currentMax);
+    if (clampedValue != widget.value) {
+      widget.onChanged(clampedValue);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  '${widget.label}: ${widget.valueLabel}',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              SizedBox(
+                width: 96,
+                child: TextField(
+                  controller: _maxController,
+                  focusNode: _maxFocusNode,
+                  keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.done,
+                  inputFormatters: <TextInputFormatter>[
+                    FilteringTextInputFormatter.digitsOnly,
+                  ],
+                  decoration: const InputDecoration(
+                    labelText: 'Max',
+                    isDense: true,
+                    border: OutlineInputBorder(),
+                  ),
+                  onSubmitted: (_) => _applyMaxValue(),
+                ),
+              ),
+            ],
+          ),
+          Slider(
+            min: 0,
+            max: _currentMax,
+            divisions: _currentMax.round(),
+            value: widget.value.clamp(0, _currentMax),
+            onChanged: widget.onChanged,
           ),
         ],
       ),
