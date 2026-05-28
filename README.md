@@ -1,17 +1,20 @@
 # test_jaguar
 
-A new Flutter project.
+Aplicacion Flutter para simular una balanza BLE y probar la comunicacion con una central.
 
-## Getting Started
+## Formas de conexion
 
-This project is a starting point for a Flutter application.
+### 1. Jaguar BLE
+La app se comporta como un periferico BLE, publica los servicios GATT y envia las mediciones por notificaciones.
+En este modo, los valores se generan automaticamente por la simulacion y se mandan en formato JSON.
 
-A few resources to get you started if this is your first Flutter project:
+### 2. Manual
+La conexion BLE se mantiene igual, pero los datos enviados se controlan desde la interfaz.
+En este modo, puedes definir manualmente valores como peso, tara, humedad y estado para probar casos especificos.
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## Funcionamiento
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+1. Se inicia la simulacion para activar el advertising BLE.
+2. Una central BLE se conecta al periferico.
+3. Se elige el modo Jaguar BLE o Manual.
+4. La app envia el JSON correspondiente segun el modo seleccionado.
