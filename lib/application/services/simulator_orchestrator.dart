@@ -30,6 +30,7 @@ class SimulatorOrchestrator {
   static const int _weightHoldTicksAfterSensorChange = 5;
   static const String _resetHoldCommand = 'AT+RSTHOLD';
   static const String _toggleTareCommand = 'AT+TARA';
+  static const String _zeroWeightCommand = 'AT+CERO';
 
   SendProtocol _sendProtocol = SendProtocol.jaguarBle;
   double _selectedHumidity = 10.0;
@@ -118,7 +119,7 @@ class SimulatorOrchestrator {
           ),
         );
 
-        await _applyManualCommandIfNeeded(status.lastReceivedCommand);
+        await _applyIncomingCommandIfNeeded(status.lastReceivedCommand);
       }),
     );
 
@@ -244,8 +245,8 @@ class SimulatorOrchestrator {
     return measurement.copyWith(estBalanza: weightChanged ? 0 : 1);
   }
 
-  Future<void> _applyManualCommandIfNeeded(String? command) async {
-    if (_sendProtocol != SendProtocol.manual || command == null || command.isEmpty) {
+  Future<void> _applyIncomingCommandIfNeeded(String? command) async {
+    if (command == null || command.isEmpty) {
       return;
     }
 
@@ -275,6 +276,10 @@ class SimulatorOrchestrator {
     }
 
     if (_isToggleTareCommand(normalizedCommand)) {
+      if (_sendProtocol != SendProtocol.manual) {
+        return;
+      }
+
       final bool activateTare = _manualMeasurement.tara == 0;
       final ScaleMeasurement toggledMeasurement = activateTare
           ? _manualMeasurement.copyWith(
@@ -303,6 +308,36 @@ class SimulatorOrchestrator {
             : 'Comando aplicado: AT+TARA -> tara desactivada',
       );
       await _sendCurrentPayloadNow();
+      return;
+    }
+
+    if (_isZeroWeightCommand(normalizedCommand)) {
+      if (_sendProtocol == SendProtocol.manual) {
+        if (_manualMeasurement.tara > 0 || _manualMeasurement.peso == 0) {
+          return;
+        }
+
+        _manualMeasurement = _normalizeManualMeasurement(
+          _manualMeasurement.copyWith(peso: 0),
+        );
+        _emit(_current.copyWith(manualMeasurement: _manualMeasurement));
+        _pushLog('Comando aplicado: AT+CERO -> peso=0 (manual)');
+        await _sendCurrentPayloadNow();
+        return;
+      }
+
+      final ScaleMeasurement currentMeasurement = _current.measurement;
+      if (currentMeasurement.tara > 0 || currentMeasurement.peso == 0) {
+        return;
+      }
+
+      final ScaleMeasurement zeroedMeasurement =
+          currentMeasurement.copyWith(peso: 0);
+      _pushLog('Comando aplicado: AT+CERO -> peso=0 (jaguar)');
+      await _notifyAndEmitMeasurement(
+        zeroedMeasurement,
+        weightHoldSecondsRemaining: _weightHoldTicksRemaining,
+      );
     }
   }
 
@@ -321,6 +356,9 @@ class SimulatorOrchestrator {
 
   bool _isToggleTareCommand(String normalizedCommand) =>
       normalizedCommand == _toggleTareCommand || normalizedCommand == 'TARA';
+
+    bool _isZeroWeightCommand(String normalizedCommand) =>
+      normalizedCommand == _zeroWeightCommand || normalizedCommand == 'CERO';
 
   List<String> _logsForBleStatusChange({
     required BlePeripheralStatus previous,
