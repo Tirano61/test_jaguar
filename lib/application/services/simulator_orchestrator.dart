@@ -1,13 +1,16 @@
 import 'dart:async';
 
 import 'package:test_jaguar/application/dto/scale_payload_dto.dart';
+import 'package:test_jaguar/application/dto/st456_payload_dto.dart';
 import 'package:test_jaguar/application/dto/simulator_status_dto.dart';
+import 'package:test_jaguar/core/constants/ble_constants.dart';
 import 'package:test_jaguar/core/extensions/stream_subscription_extensions.dart';
 import 'package:test_jaguar/domain/entities/ble_peripheral_status.dart';
 import 'package:test_jaguar/domain/entities/scale_measurement.dart';
 import 'package:test_jaguar/domain/repositories/ble_peripheral_repository.dart';
 import 'package:test_jaguar/domain/repositories/scale_simulation_repository.dart';
 import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
+import 'package:test_jaguar/domain/value_objects/st456_screen.dart';
 
 class SimulatorOrchestrator {
   SimulatorOrchestrator({
@@ -33,6 +36,7 @@ class SimulatorOrchestrator {
   static const String _zeroWeightCommand = 'AT+CERO';
 
   SendProtocol _sendProtocol = SendProtocol.jaguarBle;
+  St456Screen _st456Screen = St456Screen.main;
   double _selectedHumidity = 10.0;
   ScaleMeasurement _manualMeasurement = ScaleMeasurement.baseline;
   int _lastSensorInduc = SimulatorStatusDto.initial.measurement.sensorInduc;
@@ -61,6 +65,11 @@ class SimulatorOrchestrator {
       return;
     }
     _sendProtocol = protocol;
+    await _bleRepository.updateBleUuids(
+      protocol == SendProtocol.st456Remote
+          ? BleConstants.st456
+          : BleConstants.jaguar,
+    );
     _weightHoldTicksRemaining = 0;
     _heldWeight = null;
     _lastSensorInduc = _current.measurement.sensorInduc;
@@ -68,6 +77,20 @@ class SimulatorOrchestrator {
     _emit(_current.copyWith(sendProtocol: _sendProtocol));
     _pushLog('Protocolo seleccionado: ${protocol.label}');
     await _sendCurrentPayloadNow();
+  }
+
+  Future<void> setSt456Screen(St456Screen screen) async {
+    if (_st456Screen == screen) {
+      return;
+    }
+
+    _st456Screen = screen;
+    _emit(_current.copyWith(st456Screen: _st456Screen));
+    _pushLog('Pantalla ST456 seleccionada: ${screen.label}');
+
+    if (_sendProtocol == SendProtocol.st456Remote) {
+      await _sendCurrentPayloadNow();
+    }
   }
 
   Future<void> setManualMeasurement(ScaleMeasurement measurement) async {
@@ -83,16 +106,8 @@ class SimulatorOrchestrator {
     _selectedHumidity = _normalizeHumidity(value);
     final updatedMeasurement =
         _current.measurement.copyWith(humedad: _selectedHumidity);
-    final String json =
-        ScalePayloadDto(measurement: updatedMeasurement).toJsonUtf8String();
-
-    try {
-      await _bleRepository.notifyUtf8Json(json);
-    } catch (error) {
-      _pushLog('Error notify BLE: $error');
-    }
-
-    _emit(_current.copyWith(measurement: updatedMeasurement, lastJson: json));
+    _emit(_current.copyWith(measurement: updatedMeasurement));
+    await _sendCurrentPayloadNow();
     _pushLog('Humedad configurada: ${_selectedHumidity.toStringAsFixed(1)}');
   }
 
@@ -165,9 +180,9 @@ class SimulatorOrchestrator {
     ScaleMeasurement measurement, {
     required int weightHoldSecondsRemaining,
   }) async {
-    final String json = ScalePayloadDto(measurement: measurement).toJsonUtf8String();
+    final String payload = _payloadForCurrentProtocol(measurement);
     try {
-      await _bleRepository.notifyUtf8Json(json);
+      await _bleRepository.notifyUtf8Json(payload);
     } catch (error) {
       _pushLog('Error notify BLE: $error');
     }
@@ -176,11 +191,24 @@ class SimulatorOrchestrator {
       _current.copyWith(
         measurement: measurement,
         sendProtocol: _sendProtocol,
+        st456Screen: _st456Screen,
         manualMeasurement: _manualMeasurement,
         weightHoldSecondsRemaining: weightHoldSecondsRemaining,
-        lastJson: json,
+        lastJson: payload,
       ),
     );
+  }
+
+  String _payloadForCurrentProtocol(ScaleMeasurement measurement) {
+    if (_sendProtocol == SendProtocol.st456Remote) {
+      return St456PayloadDto(
+        screen: _st456Screen,
+        measurement: measurement,
+        now: DateTime.now(),
+      ).toProtocolString();
+    }
+
+    return ScalePayloadDto(measurement: measurement).toJsonUtf8String();
   }
 
   ScaleMeasurement _measurementForCurrentProtocol(ScaleMeasurement measurement) {
@@ -357,7 +385,7 @@ class SimulatorOrchestrator {
   bool _isToggleTareCommand(String normalizedCommand) =>
       normalizedCommand == _toggleTareCommand || normalizedCommand == 'TARA';
 
-    bool _isZeroWeightCommand(String normalizedCommand) =>
+  bool _isZeroWeightCommand(String normalizedCommand) =>
       normalizedCommand == _zeroWeightCommand || normalizedCommand == 'CERO';
 
   List<String> _logsForBleStatusChange({

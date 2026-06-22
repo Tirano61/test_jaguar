@@ -950,3 +950,4 @@ class _HeroBadge extends StatelessWidget {
     );
   }
 }
+

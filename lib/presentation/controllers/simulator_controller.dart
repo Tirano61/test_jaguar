@@ -6,11 +6,13 @@ import 'package:test_jaguar/application/use_cases/set_manual_measurement_use_cas
 import 'package:test_jaguar/application/use_cases/observe_simulator_status_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_humidity_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_send_protocol_use_case.dart';
+import 'package:test_jaguar/application/use_cases/set_st456_screen_use_case.dart';
 import 'package:test_jaguar/application/use_cases/start_simulation_use_case.dart';
 import 'package:test_jaguar/application/use_cases/stop_simulation_use_case.dart';
 import 'package:test_jaguar/core/constants/ble_constants.dart';
 import 'package:test_jaguar/domain/entities/scale_measurement.dart';
 import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
+import 'package:test_jaguar/domain/value_objects/st456_screen.dart';
 import 'package:test_jaguar/domain/value_objects/simulation_phase.dart';
 import 'package:test_jaguar/presentation/state/simulator_view_state.dart';
 
@@ -21,12 +23,14 @@ class SimulatorController extends ChangeNotifier {
     required ObserveSimulatorStatusUseCase observeStatusUseCase,
     required SetHumidityUseCase setHumidityUseCase,
     required SetSendProtocolUseCase setSendProtocolUseCase,
+    required SetSt456ScreenUseCase setSt456ScreenUseCase,
     required SetManualMeasurementUseCase setManualMeasurementUseCase,
   })  : _startSimulationUseCase = startSimulationUseCase,
         _stopSimulationUseCase = stopSimulationUseCase,
         _observeStatusUseCase = observeStatusUseCase,
         _setHumidityUseCase = setHumidityUseCase,
         _setSendProtocolUseCase = setSendProtocolUseCase,
+      _setSt456ScreenUseCase = setSt456ScreenUseCase,
         _setManualMeasurementUseCase = setManualMeasurementUseCase {
     _bind();
   }
@@ -36,6 +40,7 @@ class SimulatorController extends ChangeNotifier {
   final ObserveSimulatorStatusUseCase _observeStatusUseCase;
   final SetHumidityUseCase _setHumidityUseCase;
   final SetSendProtocolUseCase _setSendProtocolUseCase;
+  final SetSt456ScreenUseCase _setSt456ScreenUseCase;
   final SetManualMeasurementUseCase _setManualMeasurementUseCase;
 
   StreamSubscription<SimulatorStatusDto>? _statusSubscription;
@@ -57,6 +62,9 @@ class SimulatorController extends ChangeNotifier {
 
   Future<void> selectSendProtocol(SendProtocol protocol) =>
       _setSendProtocolUseCase(protocol);
+
+    Future<void> selectSt456Screen(St456Screen screen) =>
+      _setSt456ScreenUseCase(screen);
 
   Future<void> setManualTara(double value) =>
       _updateManualMeasurement(tara: value.round().clamp(0, 22000));
@@ -119,6 +127,19 @@ class SimulatorController extends ChangeNotifier {
         lastReceivedCommand: status.bleStatus.lastReceivedCommand,
         running: status.running,
         sendProtocol: status.sendProtocol,
+        serviceUuid: status.sendProtocol == SendProtocol.st456Remote
+          ? BleConstants.st456.serviceUuid
+          : BleConstants.jaguar.serviceUuid,
+        characteristicUuid: status.sendProtocol == SendProtocol.st456Remote
+          ? BleConstants.st456.notifyUuid
+          : BleConstants.jaguar.notifyUuid,
+        serviceWriteUuid: status.sendProtocol == SendProtocol.st456Remote
+          ? BleConstants.st456.writeServiceUuid
+          : BleConstants.jaguar.writeServiceUuid,
+        characteristicWriteUuid: status.sendProtocol == SendProtocol.st456Remote
+          ? BleConstants.st456.writeUuid
+          : BleConstants.jaguar.writeUuid,
+        st456Screen: status.st456Screen,
         phaseName: status.phase.label,
         weight: status.measurement.peso,
         sensorInduc: status.measurement.sensorInduc,

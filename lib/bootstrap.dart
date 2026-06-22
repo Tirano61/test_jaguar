@@ -9,6 +9,7 @@ import 'package:test_jaguar/application/use_cases/observe_simulator_status_use_c
 import 'package:test_jaguar/application/use_cases/set_humidity_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_manual_measurement_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_send_protocol_use_case.dart';
+import 'package:test_jaguar/application/use_cases/set_st456_screen_use_case.dart';
 import 'package:test_jaguar/application/use_cases/start_simulation_use_case.dart';
 import 'package:test_jaguar/application/use_cases/stop_simulation_use_case.dart';
 import 'package:test_jaguar/domain/services/linear_weight_interpolation_service.dart';
@@ -55,6 +56,7 @@ class AppBootstrap {
       observeStatusUseCase: ObserveSimulatorStatusUseCase(orchestrator),
       setHumidityUseCase: SetHumidityUseCase(orchestrator),
       setSendProtocolUseCase: SetSendProtocolUseCase(orchestrator),
+      setSt456ScreenUseCase: SetSt456ScreenUseCase(orchestrator),
       setManualMeasurementUseCase: SetManualMeasurementUseCase(orchestrator),
     );
 
