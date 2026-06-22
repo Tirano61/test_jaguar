@@ -1,4 +1,5 @@
 import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
+import 'package:test_jaguar/domain/value_objects/st456_screen.dart';
 
 class SimulatorViewState {
   const SimulatorViewState({
@@ -9,6 +10,7 @@ class SimulatorViewState {
     required this.lastReceivedCommand,
     required this.running,
     required this.sendProtocol,
+    required this.st456Screen,
     required this.phaseName,
     required this.weight,
     required this.sensorInduc,
@@ -39,6 +41,7 @@ class SimulatorViewState {
   final String? lastReceivedCommand;
   final bool running;
   final SendProtocol sendProtocol;
+  final St456Screen st456Screen;
   final String phaseName;
   final int weight;
   final int sensorInduc;
@@ -69,6 +72,7 @@ class SimulatorViewState {
     lastReceivedCommand: null,
     running: false,
     sendProtocol: SendProtocol.jaguarBle,
+    st456Screen: St456Screen.main,
     phaseName: 'loadedWaiting',
     weight: 0,
     sensorInduc: 0,
@@ -100,6 +104,7 @@ class SimulatorViewState {
     String? lastReceivedCommand,
     bool? running,
     SendProtocol? sendProtocol,
+    St456Screen? st456Screen,
     String? phaseName,
     int? weight,
     int? sensorInduc,
@@ -129,7 +134,8 @@ class SimulatorViewState {
       connectedDeviceId: connectedDeviceId ?? this.connectedDeviceId,
       lastReceivedCommand: lastReceivedCommand ?? this.lastReceivedCommand,
       running: running ?? this.running,
-        sendProtocol: sendProtocol ?? this.sendProtocol,
+      sendProtocol: sendProtocol ?? this.sendProtocol,
+      st456Screen: st456Screen ?? this.st456Screen,
       phaseName: phaseName ?? this.phaseName,
       weight: weight ?? this.weight,
       sensorInduc: sensorInduc ?? this.sensorInduc,
