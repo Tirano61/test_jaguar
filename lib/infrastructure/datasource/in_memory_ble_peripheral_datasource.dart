@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:test_jaguar/core/constants/ble_constants.dart';
 import 'package:test_jaguar/domain/entities/ble_peripheral_status.dart';
 import 'package:test_jaguar/infrastructure/datasource/ble_peripheral_datasource.dart';
 
@@ -27,6 +28,11 @@ class InMemoryBlePeripheralDataSource implements BlePeripheralDataSource {
   Future<void> stopAdvertising() async {
     _status = _status.copyWith(advertising: false, connected: false);
     _statusController.add(_status);
+  }
+
+  @override
+  Future<void> updateBleUuids(BleUuids uuids) async {
+    // No-op en el datasource in-memory.
   }
 
   @override

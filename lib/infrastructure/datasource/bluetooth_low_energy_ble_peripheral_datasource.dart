@@ -49,35 +49,12 @@ class BluetoothLowEnergyBlePeripheralDataSource
   bool _advertising = false;
   String _lastPayload = '{}';
   String _lastReceivedCommand = '';
+  BleUuids _activeUuids = BleConstants.jaguar;
+  int _packetId = 0;
+  static const bool _kRunSt456LocalTest = false;
 
-  late final GATTCharacteristic _notifyCharacteristic =
-      GATTCharacteristic.mutable(
-        uuid: UUID.fromString(BleConstants.characteristicUuid),
-        properties: <GATTCharacteristicProperty>[
-          GATTCharacteristicProperty.read,
-          GATTCharacteristicProperty.notify,
-          GATTCharacteristicProperty.indicate,
-        ],
-        permissions: <GATTCharacteristicPermission>[
-          GATTCharacteristicPermission.read,
-        ],
-        descriptors: <GATTDescriptor>[],
-      );
-
-  late final GATTCharacteristic _commandWriteCharacteristic =
-      GATTCharacteristic.mutable(
-        uuid: UUID.fromString(BleConstants.characteristicWriteUuid),
-        properties: <GATTCharacteristicProperty>[
-          GATTCharacteristicProperty.read,
-          GATTCharacteristicProperty.write,
-          GATTCharacteristicProperty.writeWithoutResponse,
-        ],
-        permissions: <GATTCharacteristicPermission>[
-          GATTCharacteristicPermission.read,
-          GATTCharacteristicPermission.write,
-        ],
-        descriptors: <GATTDescriptor>[],
-      );
+  GATTCharacteristic? _notifyCharacteristic;
+  GATTCharacteristic? _commandWriteCharacteristic;
 
   @override
   Stream<BlePeripheralStatus> watchStatus() async* {
@@ -93,28 +70,41 @@ class BluetoothLowEnergyBlePeripheralDataSource
 
     await _ensureAuthorizedAndPoweredOn();
 
+    _notifyCharacteristic = _buildNotifyCharacteristic();
+    _commandWriteCharacteristic = _buildCommandWriteCharacteristic();
+
     await _manager.removeAllServices();
     final GATTService notifyService = GATTService(
-      uuid: UUID.fromString(BleConstants.serviceUuid),
+      uuid: UUID.fromString(_activeUuids.serviceUuid),
       isPrimary: true,
       includedServices: <GATTService>[],
-      characteristics: <GATTCharacteristic>[_notifyCharacteristic],
-    );
-    final GATTService writeService = GATTService(
-      uuid: UUID.fromString(BleConstants.serviceWriteUuid),
-      isPrimary: true,
-      includedServices: <GATTService>[],
-      characteristics: <GATTCharacteristic>[_commandWriteCharacteristic],
+      characteristics: _activeUuids.writeServiceUuid == _activeUuids.serviceUuid
+          ? <GATTCharacteristic>[
+              _notifyCharacteristic!,
+              _commandWriteCharacteristic!,
+            ]
+          : <GATTCharacteristic>[_notifyCharacteristic!],
     );
     await _manager.addService(notifyService);
-    await _manager.addService(writeService);
+
+    if (_activeUuids.writeServiceUuid != _activeUuids.serviceUuid) {
+      final GATTService writeService = GATTService(
+        uuid: UUID.fromString(_activeUuids.writeServiceUuid),
+        isPrimary: true,
+        includedServices: <GATTService>[],
+        characteristics: <GATTCharacteristic>[_commandWriteCharacteristic!],
+      );
+      await _manager.addService(writeService);
+    }
 
     final Advertisement advertisement = Advertisement(
       name: Platform.isWindows ? null : 'JaguarScaleSim',
-      serviceUUIDs: <UUID>[
-        UUID.fromString(BleConstants.serviceUuid),
-        UUID.fromString(BleConstants.serviceWriteUuid),
-      ],
+      serviceUUIDs: _activeUuids.writeServiceUuid == _activeUuids.serviceUuid
+          ? <UUID>[UUID.fromString(_activeUuids.serviceUuid)]
+          : <UUID>[
+              UUID.fromString(_activeUuids.serviceUuid),
+              UUID.fromString(_activeUuids.writeServiceUuid),
+            ],
       serviceData: <UUID, Uint8List>{},
       manufacturerSpecificData: <ManufacturerSpecificData>[],
     );
@@ -148,6 +138,24 @@ class BluetoothLowEnergyBlePeripheralDataSource
   }
 
   @override
+  Future<void> updateBleUuids(BleUuids uuids) async {
+    final bool didChange = _activeUuids.serviceUuid != uuids.serviceUuid ||
+      _activeUuids.writeServiceUuid != uuids.writeServiceUuid ||
+        _activeUuids.notifyUuid != uuids.notifyUuid ||
+        _activeUuids.writeUuid != uuids.writeUuid;
+    if (!didChange) {
+      return;
+    }
+
+    _activeUuids = uuids;
+
+    if (_advertising) {
+      await stopAdvertising();
+      await startAdvertising();
+    }
+  }
+
+  @override
   Future<void> notify(String utf8JsonPayload) async {
     _lastPayload = utf8JsonPayload;
 
@@ -155,26 +163,85 @@ class BluetoothLowEnergyBlePeripheralDataSource
       return;
     }
 
-    final List<int> bytes = utf8.encode(utf8JsonPayload);
+    final GATTCharacteristic? notifyCharacteristic = _notifyCharacteristic;
+    if (notifyCharacteristic == null) {
+      return;
+    }
 
+    // If active profile is ST456, use binary framing with 5-byte header.
+    if (_activeUuids.serviceUuid.toUpperCase() == BleConstants.st456.serviceUuid.toUpperCase()) {
+      // Ensure termination CRLF and send framed ASCII payloads per-central.
+      String full = utf8JsonPayload;
+      if (!full.endsWith('\r\n')) {
+        full = full.replaceAll('\r', '').replaceAll('\n', '');
+        full = '$full\r\n';
+      }
+
+      final List<int> fullBytes = ascii.encode(full);
+      final int length = fullBytes.length;
+
+      for (final Central central in _subscribedCentrals.values) {
+        final int mtu = await _safeMaximumNotifyLength(central);
+        int chunkPayloadSize = mtu - 3 - 5;
+        if (chunkPayloadSize <= 0) {
+          chunkPayloadSize = (mtu - 8) > 0 ? (mtu - 8) : 1;
+        }
+
+        final int totalTramas = (length + chunkPayloadSize - 1) ~/ chunkPayloadSize;
+
+        for (int trama = 0; trama < totalTramas; trama++) {
+          final int offset = trama * chunkPayloadSize;
+          final int toSend = (length - offset) < chunkPayloadSize ? (length - offset) : chunkPayloadSize;
+          final Uint8List buffer = Uint8List(5 + toSend);
+          buffer[0] = _packetId & 0xFF;
+          buffer[1] = totalTramas & 0xFF;
+          buffer[2] = (trama + 1) & 0xFF;
+          buffer[3] = (length >> 8) & 0xFF;
+          buffer[4] = length & 0xFF;
+          buffer.setRange(5, 5 + toSend, fullBytes, offset);
+
+          // Debug log
+          final String previewHex = _hex(buffer, 16);
+          print('ST456 FRAME pid=${buffer[0]} total=${buffer[1]} num=${buffer[2]} length=$length toSend=$toSend preview=$previewHex');
+
+          await _manager.notifyCharacteristic(
+            central,
+            notifyCharacteristic,
+            value: buffer,
+          );
+        }
+      }
+
+      _packetId = (_packetId + 1) & 0xFF;
+      if (_kRunSt456LocalTest) {
+        // Run a local reconstruction test
+        final int sampleMtu = 20;
+        int sampleChunk = sampleMtu - 3 - 5;
+        if (sampleChunk <= 0) sampleChunk = 1;
+        _runLocalSt456Test(full, sampleChunk);
+      }
+
+      return;
+    }
+
+    // Default behaviour: chunk by maxLength and send raw utf8 bytes.
+    final List<int> bytes = utf8.encode(utf8JsonPayload);
     for (final Central central in _subscribedCentrals.values) {
       final int maxLength = await _safeMaximumNotifyLength(central);
       if (bytes.length <= maxLength) {
         await _manager.notifyCharacteristic(
           central,
-          _notifyCharacteristic,
+          notifyCharacteristic,
           value: Uint8List.fromList(bytes),
         );
         continue;
       }
 
       for (int start = 0; start < bytes.length; start += maxLength) {
-        final int end = (start + maxLength < bytes.length)
-            ? start + maxLength
-            : bytes.length;
+        final int end = (start + maxLength < bytes.length) ? start + maxLength : bytes.length;
         await _manager.notifyCharacteristic(
           central,
-          _notifyCharacteristic,
+          notifyCharacteristic,
           value: Uint8List.fromList(bytes.sublist(start, end)),
         );
       }
@@ -254,7 +321,7 @@ class BluetoothLowEnergyBlePeripheralDataSource
     final String characteristicUuid =
         event.characteristic.uuid.toString().toUpperCase();
 
-    if (characteristicUuid == BleConstants.characteristicUuid) {
+    if (characteristicUuid == _activeUuids.notifyUuid.toUpperCase()) {
       final List<int> payload = utf8.encode(_lastPayload);
       final int offset = event.request.offset;
       if (offset < 0 || offset > payload.length) {
@@ -272,7 +339,7 @@ class BluetoothLowEnergyBlePeripheralDataSource
       return;
     }
 
-    if (characteristicUuid == BleConstants.characteristicWriteUuid) {
+    if (characteristicUuid == _activeUuids.writeUuid.toUpperCase()) {
       final List<int> payload = utf8.encode(_lastReceivedCommand);
       final int offset = event.request.offset;
       if (offset < 0 || offset > payload.length) {
@@ -302,7 +369,7 @@ class BluetoothLowEnergyBlePeripheralDataSource
     final String characteristicUuid =
         event.characteristic.uuid.toString().toUpperCase();
 
-    if (characteristicUuid != BleConstants.characteristicWriteUuid) {
+    if (characteristicUuid != _activeUuids.writeUuid.toUpperCase()) {
       await _manager.respondWriteRequestWithError(
         event.request,
         error: GATTError.requestNotSupported,
@@ -375,6 +442,86 @@ class BluetoothLowEnergyBlePeripheralDataSource
     } catch (_) {
       return 20;
     }
+  }
+
+  String _hex(Uint8List data, int maxBytes) {
+    final int len = data.length < maxBytes ? data.length : maxBytes;
+    final List<String> parts = <String>[];
+    for (int i = 0; i < len; i++) {
+      parts.add(data[i].toRadixString(16).padLeft(2, '0'));
+    }
+    return parts.join(' ');
+  }
+
+  void _runLocalSt456Test(String fullMessage, int chunkPayloadSize) {
+    final List<int> bytes = ascii.encode(fullMessage);
+    final int length = bytes.length;
+    final int totalTramas = (length + chunkPayloadSize - 1) ~/ chunkPayloadSize;
+
+    final List<Uint8List> frames = <Uint8List>[];
+    for (int trama = 0; trama < totalTramas; trama++) {
+      final int offset = trama * chunkPayloadSize;
+      final int toSend = (length - offset) < chunkPayloadSize ? (length - offset) : chunkPayloadSize;
+      final Uint8List buffer = Uint8List(5 + toSend);
+      buffer[0] = 0;
+      buffer[1] = totalTramas & 0xFF;
+      buffer[2] = (trama + 1) & 0xFF;
+      buffer[3] = (length >> 8) & 0xFF;
+      buffer[4] = length & 0xFF;
+      buffer.setRange(5, 5 + toSend, bytes, offset);
+      frames.add(buffer);
+    }
+
+    print('ST456 LOCAL TEST frames=${frames.length} chunk=$chunkPayloadSize length=$length');
+
+    // Reconstruct and validate
+    final List<int> reconstructed = <int>[];
+    for (final Uint8List f in frames) {
+      final int declaredTotal = f[1];
+      final int declaredLen = (f[3] << 8) | f[4];
+      if (declaredTotal != frames.length) {
+        print('ERROR: declared total mismatch $declaredTotal vs ${frames.length}');
+      }
+      if (declaredLen != length) {
+        print('ERROR: declared length mismatch $declaredLen vs $length');
+      }
+      reconstructed.addAll(f.sublist(5));
+    }
+
+    final String reconStr = ascii.decode(reconstructed);
+    final bool ok = reconStr == fullMessage;
+    print('ST456 LOCAL TEST reconstruct ok=$ok');
+  }
+
+  GATTCharacteristic _buildNotifyCharacteristic() {
+    return GATTCharacteristic.mutable(
+      uuid: UUID.fromString(_activeUuids.notifyUuid),
+      properties: <GATTCharacteristicProperty>[
+        GATTCharacteristicProperty.read,
+        GATTCharacteristicProperty.notify,
+        GATTCharacteristicProperty.indicate,
+      ],
+      permissions: <GATTCharacteristicPermission>[
+        GATTCharacteristicPermission.read,
+      ],
+      descriptors: <GATTDescriptor>[],
+    );
+  }
+
+  GATTCharacteristic _buildCommandWriteCharacteristic() {
+    return GATTCharacteristic.mutable(
+      uuid: UUID.fromString(_activeUuids.writeUuid),
+      properties: <GATTCharacteristicProperty>[
+        GATTCharacteristicProperty.read,
+        GATTCharacteristicProperty.write,
+        GATTCharacteristicProperty.writeWithoutResponse,
+      ],
+      permissions: <GATTCharacteristicPermission>[
+        GATTCharacteristicPermission.read,
+        GATTCharacteristicPermission.write,
+      ],
+      descriptors: <GATTDescriptor>[],
+    );
   }
 
   void _emitStatus(BlePeripheralStatus next) {
