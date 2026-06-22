@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
+import 'package:test_jaguar/domain/value_objects/st456_screen.dart';
 import 'package:test_jaguar/presentation/controllers/simulator_controller.dart';
 
 class SimulatorPage extends StatelessWidget {
@@ -96,6 +97,35 @@ class SimulatorPage extends StatelessWidget {
                         },
                       ),
                     ),
+                    if (state.sendProtocol == SendProtocol.st456Remote) ...<Widget>[
+                      const SizedBox(height: 8),
+                      _SectionCard(
+                        title: 'Pantalla ST456',
+                        child: DropdownButtonFormField<St456Screen>(
+                          value: state.st456Screen,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                            contentPadding:
+                                EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                          ),
+                          items: St456Screen.values
+                              .map(
+                                (St456Screen s) => DropdownMenuItem<St456Screen>(
+                                  value: s,
+                                  child: Text(s.label),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (St456Screen? next) {
+                            if (next != null) {
+                              controller.selectSt456Screen(next);
+                            }
+                          },
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 4),
                     _SectionCard(
                       title: 'Estado BLE',
