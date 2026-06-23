@@ -46,6 +46,9 @@ class SimulatorOrchestrator {
   bool _st456LoadingActive = false;
   // decremento por tick aplicado al peso actual mostrado
   final double _st456DecrementPerTick = 1.0;
+  // Estado de cuenta regresiva para pantalla 65 (mezclando): inicia en 4:30
+  bool _st456MixingCountdownActive = false;
+  int _st456MixingCurrentSeconds = 4 * 60 + 30;
   int _lastSensorInduc = SimulatorStatusDto.initial.measurement.sensorInduc;
   int _weightHoldTicksRemaining = 0;
   int? _heldWeight;
@@ -86,6 +89,8 @@ class SimulatorOrchestrator {
       _st456LoadingActive = false;
       _st456InitialKgToLoad = null;
       _st456CurrentDisplayedPeso = 0.0;
+      _st456MixingCountdownActive = false;
+      _st456MixingCurrentSeconds = 4 * 60 + 30;
     }
 
     _emit(_current.copyWith(sendProtocol: _sendProtocol));
@@ -109,10 +114,20 @@ class SimulatorOrchestrator {
         // peso mostrado parte del peso actual y luego irá bajando
         _st456CurrentDisplayedPeso = _st456InitialKgToLoad ?? 0.0;
         _st456LoadingActive = true;
+        _st456MixingCountdownActive = false;
+        _st456MixingCurrentSeconds = 4 * 60 + 30;
+      } else if (screen == St456Screen.mixing) {
+        _st456LoadingActive = false;
+        _st456InitialKgToLoad = null;
+        _st456CurrentDisplayedPeso = 0.0;
+        _st456MixingCountdownActive = true;
+        _st456MixingCurrentSeconds = 4 * 60 + 30;
       } else {
         _st456LoadingActive = false;
         _st456InitialKgToLoad = null;
         _st456CurrentDisplayedPeso = 0.0;
+        _st456MixingCountdownActive = false;
+        _st456MixingCurrentSeconds = 4 * 60 + 30;
       }
       await _sendCurrentPayloadNow();
     }
@@ -257,6 +272,26 @@ class SimulatorOrchestrator {
           // ingrediente/identificador distinto en la pantalla manual
           return '${_st456Screen.code},${pesoActual.round()},$parcial,$kgACargar,1\r\n';
         }
+      }
+
+      // Pantalla 65 - mezclando: formato pantalla,minutos,segundos
+      // Debe iniciar en 65,4,30 y decrementar como reloj.
+      if (_st456Screen == St456Screen.mixing) {
+        if (!_st456MixingCountdownActive) {
+          _st456MixingCountdownActive = true;
+          _st456MixingCurrentSeconds = 4 * 60 + 30;
+        }
+
+        final int minutes = _st456MixingCurrentSeconds ~/ 60;
+        final int seconds = _st456MixingCurrentSeconds % 60;
+        final String seconds2 = seconds.toString().padLeft(2, '0');
+        final String payload = '${_st456Screen.code},$minutes,$seconds2\r\n';
+
+        if (_st456MixingCurrentSeconds > 0) {
+          _st456MixingCurrentSeconds -= 1;
+        }
+
+        return payload;
       }
 
       return St456PayloadDto(
