@@ -477,20 +477,33 @@ class _HeroWeightCard extends StatelessWidget {
                 ),
           ),
           const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: <Widget>[
-              if (sendProtocol != SendProtocol.manual)
-                _HeroBadge(label: phase),
-              _HeroBadge(label: 'sensorInduc: $sensorInduc'),
-              _HeroBadge(label: 'estable: $estBalanza'),
-              if (weightHoldSecondsRemaining > 0)
-                _HeroBadge(
-                  label: 'Peso congelado: ${weightHoldSecondsRemaining}s',
-                ),
-            ],
-          ),
+          // Para protocolo ST456 remoto no mostramos los chips de estado;
+          // en su lugar mostramos una aclaración sobre la cabecera binaria.
+          if (sendProtocol != SendProtocol.st456Remote)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: <Widget>[
+                if (sendProtocol != SendProtocol.manual)
+                  _HeroBadge(label: phase),
+                _HeroBadge(label: 'sensorInduc: $sensorInduc'),
+                _HeroBadge(label: 'estable: $estBalanza'),
+                if (weightHoldSecondsRemaining > 0)
+                  _HeroBadge(
+                    label: 'Peso congelado: ${weightHoldSecondsRemaining}s',
+                  ),
+              ],
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.only(top: 6.0),
+              child: Text(
+                'Protocolo ST456 (remoto): se envía una cabecera binaria de 5 bytes antes de la cadena, separada por coma.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.90),
+                    ),
+              ),
+            ),
           if (sendProtocol == SendProtocol.jaguarBle) ...<Widget>[
             const SizedBox(height: 12),
             Text(
@@ -523,6 +536,9 @@ class _HeroWeightCard extends StatelessWidget {
                 },
               ),
             ),
+          ] else if (sendProtocol == SendProtocol.st456Remote) ...<Widget>[
+            const SizedBox(height: 8),
+            // Ya mostramos la aclaración arriba, mantener separación visual
           ] else ...<Widget>[
             const SizedBox(height: 12),
             Text(
