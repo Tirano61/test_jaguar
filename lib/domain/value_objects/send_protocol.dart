@@ -8,7 +8,7 @@ enum SendProtocol {
       case SendProtocol.jaguarBle:
         return 'Jaguar BLE';
       case SendProtocol.st456Remote:
-        return 'Remoto ST456';
+        return 'Remoto ST407';
       case SendProtocol.manual:
         return 'Manual';
     }
