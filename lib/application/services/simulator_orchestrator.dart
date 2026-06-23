@@ -39,6 +39,13 @@ class SimulatorOrchestrator {
   St456Screen _st456Screen = St456Screen.main;
   double _selectedHumidity = 10.0;
   ScaleMeasurement _manualMeasurement = ScaleMeasurement.baseline;
+  // Estado para simulación de "kg a cargar" y parcial en pantallas ST456
+  double? _st456InitialKgToLoad;
+  // Peso actual mostrado en la pantalla de carga (disminuye lentamente)
+  double _st456CurrentDisplayedPeso = 0.0;
+  bool _st456LoadingActive = false;
+  // decremento por tick aplicado al peso actual mostrado
+  final double _st456DecrementPerTick = 1.0;
   int _lastSensorInduc = SimulatorStatusDto.initial.measurement.sensorInduc;
   int _weightHoldTicksRemaining = 0;
   int? _heldWeight;
@@ -74,6 +81,13 @@ class SimulatorOrchestrator {
     _heldWeight = null;
     _lastSensorInduc = _current.measurement.sensorInduc;
 
+    // Limpiar estado ST456 si ya no estamos en ese protocolo
+    if (_sendProtocol != SendProtocol.st456Remote) {
+      _st456LoadingActive = false;
+      _st456InitialKgToLoad = null;
+      _st456CurrentDisplayedPeso = 0.0;
+    }
+
     _emit(_current.copyWith(sendProtocol: _sendProtocol));
     _pushLog('Protocolo seleccionado: ${protocol.label}');
     await _sendCurrentPayloadNow();
@@ -89,6 +103,17 @@ class SimulatorOrchestrator {
     _pushLog('Pantalla ST456 seleccionada: ${screen.label}');
 
     if (_sendProtocol == SendProtocol.st456Remote) {
+      // Inicializar estado de carga cuando se seleccionan pantallas de carga
+      if (screen == St456Screen.loadingRecipe || screen == St456Screen.loadingManual) {
+        _st456InitialKgToLoad = _current.measurement.peso.toDouble();
+        // peso mostrado parte del peso actual y luego irá bajando
+        _st456CurrentDisplayedPeso = _st456InitialKgToLoad ?? 0.0;
+        _st456LoadingActive = true;
+      } else {
+        _st456LoadingActive = false;
+        _st456InitialKgToLoad = null;
+        _st456CurrentDisplayedPeso = 0.0;
+      }
       await _sendCurrentPayloadNow();
     }
   }
@@ -201,6 +226,39 @@ class SimulatorOrchestrator {
 
   String _payloadForCurrentProtocol(ScaleMeasurement measurement) {
     if (_sendProtocol == SendProtocol.st456Remote) {
+      // Para pantallas de carga (loadingRecipe, loadingManual) necesitamos
+      // mantener un 'kg a cargar' que parte del valor inicial de peso actual
+      // y va disminuyendo muy de a poco; el campo 'parcial' debe reflejar
+      // lo que ya se fue descargando (initial - current).
+      if (_st456Screen == St456Screen.loadingRecipe ||
+          _st456Screen == St456Screen.loadingManual) {
+        // Asegurar inicialización del valor estático "kg a cargar"
+        if (!_st456LoadingActive || _st456InitialKgToLoad == null) {
+          _st456InitialKgToLoad = measurement.peso.toDouble();
+          _st456CurrentDisplayedPeso = _st456InitialKgToLoad ?? 0.0;
+          _st456LoadingActive = true;
+        }
+
+        // 'kg a cargar' debe mantener el valor inicial (estático)
+        final double initial = _st456InitialKgToLoad ?? measurement.peso.toDouble();
+        // 'peso actual' se toma del measurement que llega (debe bajar)
+        final double pesoActual = measurement.peso.toDouble();
+        // 'parcial' es lo que ya se descargó: initial - pesoActual (no negativo)
+        final int parcial = (initial - pesoActual).clamp(0.0, double.infinity).round();
+        final int kgACargar = initial.round();
+
+        // Construir cadena según la pantalla
+        if (_st456Screen == St456Screen.loadingRecipe) {
+          // formato: pantalla,peso_actual,parcial,kg_a_cargar,ingrediente
+          return '${_st456Screen.code},${pesoActual.round()},$parcial,$kgACargar,Maiz\r\n';
+        }
+
+        if (_st456Screen == St456Screen.loadingManual) {
+          // ingrediente/identificador distinto en la pantalla manual
+          return '${_st456Screen.code},${pesoActual.round()},$parcial,$kgACargar,1\r\n';
+        }
+      }
+
       return St456PayloadDto(
         screen: _st456Screen,
         measurement: measurement,
@@ -216,11 +274,31 @@ class SimulatorOrchestrator {
       return _manualMeasurement;
     }
 
-    return _withScaleStateFromWeightChange(
-      _withWeightHoldAfterSensorChange(
-        measurement.copyWith(humedad: _selectedHumidity),
-      ),
-    );
+    ScaleMeasurement base = measurement.copyWith(humedad: _selectedHumidity);
+
+    // Si estamos en protocolo ST456 remoto y en una pantalla de carga, debemos
+    // mostrar un peso actual que disminuye lentamente mientras 'kg a cargar'
+    // permanece estático (inicial). Para ello usamos _st456CurrentDisplayedPeso.
+    if (_sendProtocol == SendProtocol.st456Remote &&
+        (_st456Screen == St456Screen.loadingRecipe ||
+            _st456Screen == St456Screen.loadingManual)) {
+      // Inicializar si es la primera vez
+      if (!_st456LoadingActive || _st456InitialKgToLoad == null) {
+        _st456InitialKgToLoad = base.peso.toDouble();
+        _st456CurrentDisplayedPeso = _st456InitialKgToLoad ?? base.peso.toDouble();
+        _st456LoadingActive = true;
+      }
+
+      // Decrementar el peso mostrado muy de a poco
+      double next = _st456CurrentDisplayedPeso - _st456DecrementPerTick;
+      if (next < 0.0) next = 0.0;
+      _st456CurrentDisplayedPeso = next;
+
+      // Devolver measurement con el peso modificado para UI y payload
+      return base.copyWith(peso: _st456CurrentDisplayedPeso.round());
+    }
+
+    return _withScaleStateFromWeightChange(_withWeightHoldAfterSensorChange(base));
   }
 
   double _normalizeHumidity(double value) {
