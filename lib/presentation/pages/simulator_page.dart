@@ -241,7 +241,9 @@ class SimulatorPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     _SectionCard(
-                      title: 'Ultimo JSON enviado',
+                      title: state.sendProtocol == SendProtocol.st456Remote
+                          ? 'Ultima cadena enviada'
+                          : 'Ultimo JSON enviado',
                       child: Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(12),
