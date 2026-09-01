@@ -51,6 +51,7 @@ class BluetoothLowEnergyBlePeripheralDataSource
   String _lastReceivedCommand = '';
   BleUuids _activeUuids = BleConstants.jaguar;
   int _packetId = 0;
+  int _commandSequence = 0;
   static const bool _kRunSt456LocalTest = false;
 
   GATTCharacteristic? _notifyCharacteristic;
@@ -379,7 +380,13 @@ class BluetoothLowEnergyBlePeripheralDataSource
 
     final String decoded = _decodeCommand(event.request.value);
     _lastReceivedCommand = decoded;
-    _emitStatus(_status.copyWith(lastReceivedCommand: decoded));
+    _commandSequence += 1;
+    _emitStatus(
+      _status.copyWith(
+        lastReceivedCommand: decoded,
+        commandSequence: _commandSequence,
+      ),
+    );
 
     if (event.request.offset < 0) {
       await _manager.respondWriteRequestWithError(

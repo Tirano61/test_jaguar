@@ -1,7 +1,8 @@
 enum SendProtocol {
   jaguarBle,
   st456Remote,
-  manual;
+  manual,
+  hidraulicoBle;
 
   String get label {
     switch (this) {
@@ -11,6 +12,8 @@ enum SendProtocol {
         return 'Remoto ST407';
       case SendProtocol.manual:
         return 'Manual';
+      case SendProtocol.hidraulicoBle:
+        return 'Hidráulico BLE';
     }
   }
 }
