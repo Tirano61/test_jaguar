@@ -3,6 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
 import 'package:test_jaguar/domain/value_objects/st456_screen.dart';
 import 'package:test_jaguar/presentation/controllers/simulator_controller.dart';
+import 'package:test_jaguar/presentation/pages/hydraulic_simulator_page.dart';
+import 'package:test_jaguar/presentation/widgets/protocol_status_header.dart';
+import 'package:test_jaguar/presentation/widgets/section_card.dart';
 
 class SimulatorPage extends StatelessWidget {
   const SimulatorPage({required this.controller, super.key});
@@ -15,6 +18,11 @@ class SimulatorPage extends StatelessWidget {
       animation: controller,
       builder: (BuildContext context, Widget? child) {
         final state = controller.state;
+
+        if (state.sendProtocol == SendProtocol.hidraulicoBle) {
+          return HydraulicSimulatorPage(controller: controller);
+        }
+
         final ColorScheme scheme = Theme.of(context).colorScheme;
         final List<String> commandLogs = state.logs
             .where((String line) => line.startsWith('Comando recibido:'))
@@ -76,33 +84,19 @@ class SimulatorPage extends StatelessWidget {
                           ),
                     ),
                     const SizedBox(height: 4),
-                    _SectionCard(
-                      title: 'Protocolo de envio',
-                      child: SegmentedButton<SendProtocol>(
-                        segments: SendProtocol.values
-                            .map(
-                              (SendProtocol protocol) =>
-                                  ButtonSegment<SendProtocol>(
-                                value: protocol,
-                                label: Text(protocol.label),
-                              ),
-                            )
-                            .toList(),
-                        selected: <SendProtocol>{state.sendProtocol},
-                        onSelectionChanged: (Set<SendProtocol> selection) {
-                          if (selection.isEmpty) {
-                            return;
-                          }
-                          controller.selectSendProtocol(selection.first);
-                        },
-                      ),
+                    ProtocolStatusHeader(
+                      sendProtocol: state.sendProtocol,
+                      onProtocolChanged: controller.selectSendProtocol,
+                      bleEnabled: state.bleEnabled,
+                      advertising: state.advertising,
+                      connected: state.connected,
                     ),
                     if (state.sendProtocol == SendProtocol.st456Remote) ...<Widget>[
                       const SizedBox(height: 8),
-                      _SectionCard(
+                      SectionCard(
                         title: 'Pantalla ST456',
                         child: DropdownButtonFormField<St456Screen>(
-                          value: state.st456Screen,
+                          initialValue: state.st456Screen,
                           isExpanded: true,
                           decoration: const InputDecoration(
                             border: OutlineInputBorder(),
@@ -126,34 +120,6 @@ class SimulatorPage extends StatelessWidget {
                         ),
                       ),
                     ],
-                    const SizedBox(height: 4),
-                    _SectionCard(
-                      title: 'Estado BLE',
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: <Widget>[
-                          _StateChip(
-                            label: 'BLE',
-                            active: state.bleEnabled,
-                            activeText: 'ON',
-                            inactiveText: 'OFF',
-                          ),
-                          _StateChip(
-                            label: 'Advertising',
-                            active: state.advertising,
-                            activeText: 'ACTIVO',
-                            inactiveText: 'INACTIVO',
-                          ),
-                          _StateChip(
-                            label: 'Conexion',
-                            active: state.connected,
-                            activeText: 'CONECTADO',
-                            inactiveText: 'DESCONECTADO',
-                          ),
-                        ],
-                      ),
-                    ),
                     const SizedBox(height: 4),
                     _HeroWeightCard(
                       sendProtocol: state.sendProtocol,
@@ -240,7 +206,7 @@ class SimulatorPage extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    _SectionCard(
+                    SectionCard(
                       title: state.sendProtocol == SendProtocol.st456Remote
                           ? 'Ultima cadena enviada'
                           : 'Ultimo JSON enviado',
@@ -286,7 +252,7 @@ class SimulatorPage extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 4),
-                    _SectionCard(
+                    SectionCard(
                       title: 'Log de comandos recibidos',
                       child: commandLogs.isEmpty
                           ? const Text('Sin comandos recibidos por el momento')
@@ -341,60 +307,6 @@ class SimulatorPage extends StatelessWidget {
     );
   }
 
-}
-
-class _SectionCard extends StatelessWidget {
-  const _SectionCard({
-    required this.title,
-    required this.child,
-  });
-
-  final String title;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(title, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 10),
-            child,
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StateChip extends StatelessWidget {
-  const _StateChip({
-    required this.label,
-    required this.active,
-    required this.activeText,
-    required this.inactiveText,
-  });
-
-  final String label;
-  final bool active;
-  final String activeText;
-  final String inactiveText;
-
-  @override
-  Widget build(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
-    return Chip(
-      avatar: Icon(
-        active ? Icons.check_circle : Icons.cancel,
-        size: 18,
-        color: active ? scheme.primary : scheme.error,
-      ),
-      label: Text('$label: ${active ? activeText : inactiveText}'),
-    );
-  }
 }
 
 class _GlowCircle extends StatelessWidget {
@@ -600,7 +512,7 @@ class _ManualPayloadCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _SectionCard(
+    return SectionCard(
       title: 'Payload manual',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

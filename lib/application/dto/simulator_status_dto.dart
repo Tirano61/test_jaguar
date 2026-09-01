@@ -1,5 +1,7 @@
 import 'package:test_jaguar/domain/entities/ble_peripheral_status.dart';
 import 'package:test_jaguar/domain/entities/scale_measurement.dart';
+import 'package:test_jaguar/domain/value_objects/hydraulic_discharge_command.dart';
+import 'package:test_jaguar/domain/value_objects/hydraulic_movement_command.dart';
 import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
 import 'package:test_jaguar/domain/value_objects/st456_screen.dart';
 import 'package:test_jaguar/domain/value_objects/simulation_phase.dart';
@@ -16,6 +18,15 @@ class SimulatorStatusDto {
     required this.weightHoldSecondsRemaining,
     required this.lastJson,
     required this.logs,
+    required this.tomaFuerza,
+    required this.errorEcu,
+    required this.tuboAbierto,
+    required this.guillotinaAbierta,
+    required this.hydraulicDischargeActive,
+    required this.hydraulicInitialPeso,
+    required this.hydraulicTargetPeso,
+    this.lastHydraulicInicio,
+    this.lastHydraulicMovimiento,
   });
 
   final BlePeripheralStatus bleStatus;
@@ -28,6 +39,15 @@ class SimulatorStatusDto {
   final int weightHoldSecondsRemaining;
   final String lastJson;
   final List<String> logs;
+  final int tomaFuerza;
+  final String errorEcu;
+  final bool tuboAbierto;
+  final bool guillotinaAbierta;
+  final bool hydraulicDischargeActive;
+  final double hydraulicInitialPeso;
+  final double hydraulicTargetPeso;
+  final HydraulicDischargeCommand? lastHydraulicInicio;
+  final HydraulicMovementCommand? lastHydraulicMovimiento;
 
   static const SimulatorStatusDto initial = SimulatorStatusDto(
     bleStatus: BlePeripheralStatus.initial,
@@ -40,6 +60,13 @@ class SimulatorStatusDto {
     weightHoldSecondsRemaining: 0,
     lastJson: '{}',
     logs: <String>[],
+    tomaFuerza: 0,
+    errorEcu: '',
+    tuboAbierto: false,
+    guillotinaAbierta: false,
+    hydraulicDischargeActive: false,
+    hydraulicInitialPeso: 0.0,
+    hydraulicTargetPeso: 0.0,
   );
 
   SimulatorStatusDto copyWith({
@@ -53,6 +80,15 @@ class SimulatorStatusDto {
     int? weightHoldSecondsRemaining,
     String? lastJson,
     List<String>? logs,
+    int? tomaFuerza,
+    String? errorEcu,
+    bool? tuboAbierto,
+    bool? guillotinaAbierta,
+    bool? hydraulicDischargeActive,
+    double? hydraulicInitialPeso,
+    double? hydraulicTargetPeso,
+    HydraulicDischargeCommand? lastHydraulicInicio,
+    HydraulicMovementCommand? lastHydraulicMovimiento,
   }) {
     return SimulatorStatusDto(
       bleStatus: bleStatus ?? this.bleStatus,
@@ -66,6 +102,17 @@ class SimulatorStatusDto {
           weightHoldSecondsRemaining ?? this.weightHoldSecondsRemaining,
       lastJson: lastJson ?? this.lastJson,
       logs: logs ?? this.logs,
+      tomaFuerza: tomaFuerza ?? this.tomaFuerza,
+      errorEcu: errorEcu ?? this.errorEcu,
+      tuboAbierto: tuboAbierto ?? this.tuboAbierto,
+      guillotinaAbierta: guillotinaAbierta ?? this.guillotinaAbierta,
+      hydraulicDischargeActive:
+          hydraulicDischargeActive ?? this.hydraulicDischargeActive,
+      hydraulicInitialPeso: hydraulicInitialPeso ?? this.hydraulicInitialPeso,
+      hydraulicTargetPeso: hydraulicTargetPeso ?? this.hydraulicTargetPeso,
+      lastHydraulicInicio: lastHydraulicInicio ?? this.lastHydraulicInicio,
+      lastHydraulicMovimiento:
+          lastHydraulicMovimiento ?? this.lastHydraulicMovimiento,
     );
   }
 }
