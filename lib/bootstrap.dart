@@ -6,10 +6,13 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:test_jaguar/application/services/simulator_orchestrator.dart';
 import 'package:test_jaguar/application/use_cases/observe_simulator_status_use_case.dart';
+import 'package:test_jaguar/application/use_cases/send_guardar_event_use_case.dart';
+import 'package:test_jaguar/application/use_cases/set_error_ecu_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_humidity_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_manual_measurement_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_send_protocol_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_st456_screen_use_case.dart';
+import 'package:test_jaguar/application/use_cases/set_toma_fuerza_use_case.dart';
 import 'package:test_jaguar/application/use_cases/start_simulation_use_case.dart';
 import 'package:test_jaguar/application/use_cases/stop_simulation_use_case.dart';
 import 'package:test_jaguar/domain/services/linear_weight_interpolation_service.dart';
@@ -58,6 +61,9 @@ class AppBootstrap {
       setSendProtocolUseCase: SetSendProtocolUseCase(orchestrator),
       setSt456ScreenUseCase: SetSt456ScreenUseCase(orchestrator),
       setManualMeasurementUseCase: SetManualMeasurementUseCase(orchestrator),
+      setTomaFuerzaUseCase: SetTomaFuerzaUseCase(orchestrator),
+      setErrorEcuUseCase: SetErrorEcuUseCase(orchestrator),
+      sendGuardarEventUseCase: SendGuardarEventUseCase(orchestrator),
     );
 
     runApp(_AppRoot(

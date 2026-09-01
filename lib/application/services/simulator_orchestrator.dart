@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:test_jaguar/application/dto/hydraulic_payload_dto.dart';
 import 'package:test_jaguar/application/dto/scale_payload_dto.dart';
 import 'package:test_jaguar/application/dto/st456_payload_dto.dart';
 import 'package:test_jaguar/application/dto/simulator_status_dto.dart';
@@ -9,6 +10,8 @@ import 'package:test_jaguar/domain/entities/ble_peripheral_status.dart';
 import 'package:test_jaguar/domain/entities/scale_measurement.dart';
 import 'package:test_jaguar/domain/repositories/ble_peripheral_repository.dart';
 import 'package:test_jaguar/domain/repositories/scale_simulation_repository.dart';
+import 'package:test_jaguar/domain/value_objects/hydraulic_discharge_command.dart';
+import 'package:test_jaguar/domain/value_objects/hydraulic_movement_command.dart';
 import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
 import 'package:test_jaguar/domain/value_objects/st456_screen.dart';
 
@@ -54,6 +57,21 @@ class SimulatorOrchestrator {
   int? _heldWeight;
   SimulatorStatusDto _current = SimulatorStatusDto.initial;
 
+  // --- Estado modo Hidráulico BLE ---
+  int _tomaFuerza = 0;
+  String _errorEcu = '';
+  bool _tuboAbierto = false;
+  bool _guillotinaAbierta = false;
+  HydraulicDischargeCommand? _lastHydraulicInicio;
+  HydraulicMovementCommand? _lastHydraulicMovimiento;
+  bool _hydraulicDischargeActive = false;
+  bool _hydraulicJustCompleted = false;
+  double _hydraulicCurrentDisplayedPeso = 0.0;
+  double _hydraulicInitialPeso = 0.0;
+  double _hydraulicTargetPeso = 0.0;
+  double _hydraulicDecrementPerTick = 0.0;
+  int _lastProcessedCommandSequence = -1;
+
   double get selectedHumidity => _selectedHumidity;
 
   Stream<SimulatorStatusDto> watchStatus() => _statusController.stream;
@@ -93,9 +111,54 @@ class SimulatorOrchestrator {
       _st456MixingCurrentSeconds = 4 * 60 + 30;
     }
 
-    _emit(_current.copyWith(sendProtocol: _sendProtocol));
+    // Limpiar estado de ejecución hidráulico si ya no estamos en ese
+    // protocolo (tomaFuerza/errorEcu se conservan, son configuración, no
+    // estado de una corrida en curso).
+    if (_sendProtocol != SendProtocol.hidraulicoBle) {
+      _hydraulicDischargeActive = false;
+      _hydraulicCurrentDisplayedPeso = 0.0;
+      _hydraulicInitialPeso = 0.0;
+      _hydraulicTargetPeso = 0.0;
+      _hydraulicDecrementPerTick = 0.0;
+      _tuboAbierto = false;
+      _guillotinaAbierta = false;
+    }
+
+    _emit(_withHydraulicSnapshot(_current.copyWith(sendProtocol: _sendProtocol)));
     _pushLog('Protocolo seleccionado: ${protocol.label}');
     await _sendCurrentPayloadNow();
+  }
+
+  Future<void> setTomaFuerza(int value) async {
+    final int next = value.clamp(0, 3);
+    if (_tomaFuerza == next) {
+      return;
+    }
+    _tomaFuerza = next;
+    _pushLog('Toma de fuerza configurada: $_tomaFuerza');
+    await _sendCurrentPayloadNow();
+  }
+
+  Future<void> setErrorEcu(String value) async {
+    if (_errorEcu == value) {
+      return;
+    }
+    _errorEcu = value;
+    _pushLog('errorEcu configurado: "$_errorEcu"');
+    await _sendCurrentPayloadNow();
+  }
+
+  /// Envía el evento `AT+GUARDAR` crudo por notify BLE. Se dispara solo al
+  /// completar una descarga simulada, y también puede forzarse a mano desde
+  /// la UI en cualquier momento.
+  Future<void> sendGuardarEvent() async {
+    try {
+      await _bleRepository.notifyUtf8Json('AT+GUARDAR\r\n');
+    } catch (error) {
+      _pushLog('Error enviando AT+GUARDAR: $error');
+      return;
+    }
+    _pushLog('AT+GUARDAR enviado');
   }
 
   Future<void> setSt456Screen(St456Screen screen) async {
@@ -174,7 +237,15 @@ class SimulatorOrchestrator {
           ),
         );
 
-        await _applyIncomingCommandIfNeeded(status.lastReceivedCommand);
+        // status.commandSequence sólo cambia con un write real; sin este
+        // guard, cualquier emisión de watchStatus() no relacionada
+        // (adapter on/off, conexión de central, etc.) reprocesaría el mismo
+        // último comando recibido, lo cual es inaceptable para AT+INICIO
+        // (reiniciaría la descarga simulada) y AT+GUARDAR (se reenviaría).
+        if (status.commandSequence != _lastProcessedCommandSequence) {
+          _lastProcessedCommandSequence = status.commandSequence;
+          await _applyIncomingCommandIfNeeded(status.lastReceivedCommand);
+        }
       }),
     );
 
@@ -201,6 +272,15 @@ class SimulatorOrchestrator {
                   ? 0
                   : _weightHoldTicksRemaining,
         );
+
+        if (_hydraulicJustCompleted) {
+          _hydraulicJustCompleted = false;
+          _pushLog(
+            'Descarga hidráulica completada (peso objetivo alcanzado): '
+            'enviando AT+GUARDAR',
+          );
+          await sendGuardarEvent();
+        }
       }),
     );
   }
@@ -228,18 +308,42 @@ class SimulatorOrchestrator {
     }
 
     _emit(
-      _current.copyWith(
-        measurement: measurement,
-        sendProtocol: _sendProtocol,
-        st456Screen: _st456Screen,
-        manualMeasurement: _manualMeasurement,
-        weightHoldSecondsRemaining: weightHoldSecondsRemaining,
-        lastJson: payload,
+      _withHydraulicSnapshot(
+        _current.copyWith(
+          measurement: measurement,
+          sendProtocol: _sendProtocol,
+          st456Screen: _st456Screen,
+          manualMeasurement: _manualMeasurement,
+          weightHoldSecondsRemaining: weightHoldSecondsRemaining,
+          lastJson: payload,
+        ),
       ),
     );
   }
 
+  SimulatorStatusDto _withHydraulicSnapshot(SimulatorStatusDto value) {
+    return value.copyWith(
+      tomaFuerza: _tomaFuerza,
+      errorEcu: _errorEcu,
+      tuboAbierto: _tuboAbierto,
+      guillotinaAbierta: _guillotinaAbierta,
+      hydraulicDischargeActive: _hydraulicDischargeActive,
+      hydraulicInitialPeso: _hydraulicInitialPeso,
+      hydraulicTargetPeso: _hydraulicTargetPeso,
+      lastHydraulicInicio: _lastHydraulicInicio,
+      lastHydraulicMovimiento: _lastHydraulicMovimiento,
+    );
+  }
+
   String _payloadForCurrentProtocol(ScaleMeasurement measurement) {
+    if (_sendProtocol == SendProtocol.hidraulicoBle) {
+      return HydraulicPayloadDto(
+        measurement: measurement,
+        tomaFuerza: _tomaFuerza,
+        errorEcu: _errorEcu,
+      ).toJsonUtf8String();
+    }
+
     if (_sendProtocol == SendProtocol.st456Remote) {
       // Para pantallas de carga (loadingRecipe, loadingManual) necesitamos
       // mantener un 'kg a cargar' que parte del valor inicial de peso actual
@@ -310,6 +414,22 @@ class SimulatorOrchestrator {
     }
 
     ScaleMeasurement base = measurement.copyWith(humedad: _selectedHumidity);
+
+    // Descarga hidráulica simulada en curso: el peso mostrado baja desde el
+    // valor que tenía al llegar AT+INICIO hacia el objetivo (peso - kgDescarga)
+    // a la tasa por tick derivada de 'velocidad'. Al llegar, se marca
+    // _hydraulicJustCompleted para que el listener dispare AT+GUARDAR.
+    if (_sendProtocol == SendProtocol.hidraulicoBle && _hydraulicDischargeActive) {
+      final double next = _hydraulicCurrentDisplayedPeso - _hydraulicDecrementPerTick;
+      if (next <= _hydraulicTargetPeso) {
+        _hydraulicCurrentDisplayedPeso = _hydraulicTargetPeso;
+        _hydraulicDischargeActive = false;
+        _hydraulicJustCompleted = true;
+      } else {
+        _hydraulicCurrentDisplayedPeso = next;
+      }
+      return base.copyWith(peso: _hydraulicCurrentDisplayedPeso.round());
+    }
 
     // Si estamos en protocolo ST456 remoto y en una pantalla de carga, debemos
     // mostrar un peso actual que disminuye lentamente mientras 'kg a cargar'
@@ -479,6 +599,93 @@ class SimulatorOrchestrator {
         zeroedMeasurement,
         weightHoldSecondsRemaining: _weightHoldTicksRemaining,
       );
+      return;
+    }
+
+    final HydraulicDischargeCommand? inicio =
+        HydraulicDischargeCommand.tryParse(normalizedCommand);
+    if (inicio != null) {
+      if (_sendProtocol == SendProtocol.hidraulicoBle) {
+        await _applyHydraulicInicio(inicio);
+      } else {
+        _pushLog(
+          'AT+INICIO recibido pero se ignora: seleccioná "Hidráulico BLE" '
+          'para procesarlo (${inicio.summary}).',
+        );
+      }
+      return;
+    }
+
+    final HydraulicMovementCommand? movimiento =
+        HydraulicMovementCommand.tryParse(normalizedCommand);
+    if (movimiento != null) {
+      if (_sendProtocol == SendProtocol.hidraulicoBle) {
+        await _applyHydraulicMovimiento(movimiento);
+      } else {
+        _pushLog(
+          'AT+MOVIMIENTO recibido pero se ignora: seleccioná "Hidráulico BLE" '
+          'para procesarlo (${movimiento.label}).',
+        );
+      }
+      return;
+    }
+  }
+
+  Future<void> _applyHydraulicInicio(HydraulicDischargeCommand command) async {
+    _lastHydraulicInicio = command;
+
+    final int currentPeso = _current.measurement.peso;
+    final bool validRange = command.hasValidRange;
+    final bool validAgainstCurrent = command.kgDescarga < currentPeso;
+
+    if (!validRange || !validAgainstCurrent) {
+      _pushLog(
+        'AT+INICIO recibido con parámetros inválidos (${command.summary}): '
+        'se requiere kgDescarga > kgTubo y kgDescarga < peso actual '
+        '($currentPeso kg). No se inicia la descarga simulada.',
+      );
+      await _sendCurrentPayloadNow();
+      return;
+    }
+
+    _hydraulicCurrentDisplayedPeso = currentPeso.toDouble();
+    _hydraulicInitialPeso = currentPeso.toDouble();
+    _hydraulicTargetPeso = (currentPeso - command.kgDescarga).toDouble();
+    _hydraulicDecrementPerTick = _hydraulicRateForVelocidad(command.velocidad);
+    _hydraulicDischargeActive = true;
+
+    _pushLog('AT+INICIO recibido: ${command.summary}');
+    await _sendCurrentPayloadNow();
+  }
+
+  Future<void> _applyHydraulicMovimiento(
+    HydraulicMovementCommand command,
+  ) async {
+    _lastHydraulicMovimiento = command;
+
+    final bool? opens = command.opens;
+    if (command.affectsTube && opens != null) {
+      _tuboAbierto = opens;
+    } else if (command.affectsGuillotine && opens != null) {
+      _guillotinaAbierta = opens;
+    }
+
+    _pushLog('AT+MOVIMIENTO recibido: ${command.label} (tipo=${command.tipo})');
+    await _sendCurrentPayloadNow();
+  }
+
+  double _hydraulicRateForVelocidad(int velocidad) {
+    switch (velocidad) {
+      case 1:
+        return 20.0; // lenta
+      case 2:
+        return 50.0; // normal
+      case 3:
+        return 120.0; // rápida
+      case 4:
+        return 70.0; // variable (valor intermedio fijo, sin jitter)
+      default:
+        return 50.0;
     }
   }
 

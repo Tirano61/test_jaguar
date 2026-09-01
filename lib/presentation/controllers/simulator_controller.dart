@@ -2,11 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:test_jaguar/application/dto/simulator_status_dto.dart';
+import 'package:test_jaguar/application/use_cases/send_guardar_event_use_case.dart';
+import 'package:test_jaguar/application/use_cases/set_error_ecu_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_manual_measurement_use_case.dart';
 import 'package:test_jaguar/application/use_cases/observe_simulator_status_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_humidity_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_send_protocol_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_st456_screen_use_case.dart';
+import 'package:test_jaguar/application/use_cases/set_toma_fuerza_use_case.dart';
 import 'package:test_jaguar/application/use_cases/start_simulation_use_case.dart';
 import 'package:test_jaguar/application/use_cases/stop_simulation_use_case.dart';
 import 'package:test_jaguar/core/constants/ble_constants.dart';
@@ -25,13 +28,19 @@ class SimulatorController extends ChangeNotifier {
     required SetSendProtocolUseCase setSendProtocolUseCase,
     required SetSt456ScreenUseCase setSt456ScreenUseCase,
     required SetManualMeasurementUseCase setManualMeasurementUseCase,
+    required SetTomaFuerzaUseCase setTomaFuerzaUseCase,
+    required SetErrorEcuUseCase setErrorEcuUseCase,
+    required SendGuardarEventUseCase sendGuardarEventUseCase,
   })  : _startSimulationUseCase = startSimulationUseCase,
         _stopSimulationUseCase = stopSimulationUseCase,
         _observeStatusUseCase = observeStatusUseCase,
         _setHumidityUseCase = setHumidityUseCase,
         _setSendProtocolUseCase = setSendProtocolUseCase,
       _setSt456ScreenUseCase = setSt456ScreenUseCase,
-        _setManualMeasurementUseCase = setManualMeasurementUseCase {
+        _setManualMeasurementUseCase = setManualMeasurementUseCase,
+        _setTomaFuerzaUseCase = setTomaFuerzaUseCase,
+        _setErrorEcuUseCase = setErrorEcuUseCase,
+        _sendGuardarEventUseCase = sendGuardarEventUseCase {
     _bind();
   }
 
@@ -42,6 +51,9 @@ class SimulatorController extends ChangeNotifier {
   final SetSendProtocolUseCase _setSendProtocolUseCase;
   final SetSt456ScreenUseCase _setSt456ScreenUseCase;
   final SetManualMeasurementUseCase _setManualMeasurementUseCase;
+  final SetTomaFuerzaUseCase _setTomaFuerzaUseCase;
+  final SetErrorEcuUseCase _setErrorEcuUseCase;
+  final SendGuardarEventUseCase _sendGuardarEventUseCase;
 
   StreamSubscription<SimulatorStatusDto>? _statusSubscription;
 
@@ -65,6 +77,12 @@ class SimulatorController extends ChangeNotifier {
 
     Future<void> selectSt456Screen(St456Screen screen) =>
       _setSt456ScreenUseCase(screen);
+
+  Future<void> setTomaFuerza(int value) => _setTomaFuerzaUseCase(value);
+
+  Future<void> setErrorEcu(String value) => _setErrorEcuUseCase(value);
+
+  Future<void> sendGuardarEvent() => _sendGuardarEventUseCase();
 
   Future<void> setManualTara(double value) =>
       _updateManualMeasurement(tara: value.round().clamp(0, 22000));
@@ -155,6 +173,15 @@ class SimulatorController extends ChangeNotifier {
         manualSensorInduc: status.manualMeasurement.sensorInduc,
         lastJson: status.lastJson,
         logs: status.logs,
+        tomaFuerza: status.tomaFuerza,
+        errorEcu: status.errorEcu,
+        tuboAbierto: status.tuboAbierto,
+        guillotinaAbierta: status.guillotinaAbierta,
+        hydraulicDischargeActive: status.hydraulicDischargeActive,
+        hydraulicInitialPeso: status.hydraulicInitialPeso,
+        hydraulicTargetPeso: status.hydraulicTargetPeso,
+        lastHydraulicInicio: status.lastHydraulicInicio,
+        lastHydraulicMovimiento: status.lastHydraulicMovimiento,
       );
       notifyListeners();
     });
