@@ -58,6 +58,12 @@ class SimulatorOrchestrator {
   SimulatorStatusDto _current = SimulatorStatusDto.initial;
 
   // --- Estado modo Hidráulico BLE ---
+  // Peso/sensor propios de este modo: no dependen del motor de simulación
+  // automático (no hay ciclo de fases acá). sensorInduc queda siempre en 0
+  // (carga) — la transición carga/descarga la maneja la app conectada por
+  // AT+INICIO/AT+GUARDAR, no el sensor. peso solo cambia si el tester lo
+  // edita a mano o por una descarga activa iniciada con AT+INICIO.
+  ScaleMeasurement _hydraulicMeasurement = ScaleMeasurement.baseline;
   int _tomaFuerza = 0;
   String _errorEcu = '';
   bool _tuboAbierto = false;
@@ -126,6 +132,19 @@ class SimulatorOrchestrator {
 
     _emit(_withHydraulicSnapshot(_current.copyWith(sendProtocol: _sendProtocol)));
     _pushLog('Protocolo seleccionado: ${protocol.label}');
+    await _sendCurrentPayloadNow();
+  }
+
+  Future<void> setHydraulicPeso(int value) async {
+    if (_hydraulicDischargeActive) {
+      return; // no se edita a mano mientras hay una descarga en curso
+    }
+    final int next = value.clamp(0, 22000);
+    if (_hydraulicMeasurement.peso == next) {
+      return;
+    }
+    _hydraulicMeasurement = _hydraulicMeasurement.copyWith(peso: next);
+    _pushLog('Peso hidráulico configurado: $next kg');
     await _sendCurrentPayloadNow();
   }
 
@@ -413,23 +432,34 @@ class SimulatorOrchestrator {
       return _manualMeasurement;
     }
 
-    ScaleMeasurement base = measurement.copyWith(humedad: _selectedHumidity);
-
-    // Descarga hidráulica simulada en curso: el peso mostrado baja desde el
-    // valor que tenía al llegar AT+INICIO hacia el objetivo (peso - kgDescarga)
-    // a la tasa por tick derivada de 'velocidad'. Al llegar, se marca
-    // _hydraulicJustCompleted para que el listener dispare AT+GUARDAR.
-    if (_sendProtocol == SendProtocol.hidraulicoBle && _hydraulicDischargeActive) {
-      final double next = _hydraulicCurrentDisplayedPeso - _hydraulicDecrementPerTick;
-      if (next <= _hydraulicTargetPeso) {
-        _hydraulicCurrentDisplayedPeso = _hydraulicTargetPeso;
-        _hydraulicDischargeActive = false;
-        _hydraulicJustCompleted = true;
-      } else {
-        _hydraulicCurrentDisplayedPeso = next;
+    // Hidráulico BLE no usa el motor de simulación automático (measurement,
+    // el tick de fases carga/descarga): el peso queda fijo salvo que el
+    // tester lo edite a mano o haya una descarga activa por AT+INICIO, y
+    // sensorInduc nunca cambia (la app conectada maneja la transición
+    // carga/descarga por comando, no por sensor).
+    if (_sendProtocol == SendProtocol.hidraulicoBle) {
+      if (_hydraulicDischargeActive) {
+        final double next =
+            _hydraulicCurrentDisplayedPeso - _hydraulicDecrementPerTick;
+        if (next <= _hydraulicTargetPeso) {
+          _hydraulicCurrentDisplayedPeso = _hydraulicTargetPeso;
+          _hydraulicDischargeActive = false;
+          _hydraulicJustCompleted = true;
+          _hydraulicMeasurement = _hydraulicMeasurement.copyWith(
+            peso: _hydraulicCurrentDisplayedPeso.round(),
+          );
+        } else {
+          _hydraulicCurrentDisplayedPeso = next;
+        }
+        return _hydraulicMeasurement.copyWith(
+          peso: _hydraulicCurrentDisplayedPeso.round(),
+          humedad: _selectedHumidity,
+        );
       }
-      return base.copyWith(peso: _hydraulicCurrentDisplayedPeso.round());
+      return _hydraulicMeasurement.copyWith(humedad: _selectedHumidity);
     }
+
+    ScaleMeasurement base = measurement.copyWith(humedad: _selectedHumidity);
 
     // Si estamos en protocolo ST456 remoto y en una pantalla de carga, debemos
     // mostrar un peso actual que disminuye lentamente mientras 'kg a cargar'
