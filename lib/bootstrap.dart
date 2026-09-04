@@ -9,6 +9,7 @@ import 'package:test_jaguar/application/use_cases/observe_simulator_status_use_c
 import 'package:test_jaguar/application/use_cases/send_guardar_event_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_error_ecu_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_humidity_use_case.dart';
+import 'package:test_jaguar/application/use_cases/set_hydraulic_peso_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_manual_measurement_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_send_protocol_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_st456_screen_use_case.dart';
@@ -64,6 +65,7 @@ class AppBootstrap {
       setTomaFuerzaUseCase: SetTomaFuerzaUseCase(orchestrator),
       setErrorEcuUseCase: SetErrorEcuUseCase(orchestrator),
       sendGuardarEventUseCase: SendGuardarEventUseCase(orchestrator),
+      setHydraulicPesoUseCase: SetHydraulicPesoUseCase(orchestrator),
     );
 
     runApp(_AppRoot(
