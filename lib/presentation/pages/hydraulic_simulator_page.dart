@@ -63,6 +63,7 @@ class HydraulicSimulatorPage extends StatelessWidget {
               targetPeso: state.hydraulicTargetPeso,
               humidity: state.humidity,
               onHumidityChanged: controller.setHumidity,
+              onWeightChanged: controller.setHydraulicPeso,
             ),
             const SizedBox(height: 4),
             SectionCard(
@@ -220,6 +221,7 @@ class _HydraulicWeightCard extends StatelessWidget {
     required this.targetPeso,
     required this.humidity,
     required this.onHumidityChanged,
+    required this.onWeightChanged,
   });
 
   final int weight;
@@ -228,6 +230,7 @@ class _HydraulicWeightCard extends StatelessWidget {
   final double targetPeso;
   final double humidity;
   final ValueChanged<double> onHumidityChanged;
+  final ValueChanged<int> onWeightChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -271,6 +274,38 @@ class _HydraulicWeightCard extends StatelessWidget {
                   color: Colors.white,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -1,
+                ),
+          ),
+          const SizedBox(height: 4),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              activeTrackColor: Colors.white,
+              inactiveTrackColor: Colors.white.withValues(alpha: 0.26),
+              thumbColor: const Color(0xFF0D5A5D),
+              overlayColor: Colors.white.withValues(alpha: 0.16),
+              valueIndicatorColor: Colors.white,
+              valueIndicatorTextStyle: const TextStyle(
+                color: Color(0xFF0D5A5D),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            child: Slider(
+              min: 0,
+              max: 22000,
+              divisions: 220,
+              value: weight.toDouble().clamp(0, 22000),
+              label: '$weight kg',
+              onChanged: dischargeActive
+                  ? null
+                  : (double value) => onWeightChanged(value.round()),
+            ),
+          ),
+          Text(
+            dischargeActive
+                ? 'El peso lo maneja la descarga en curso'
+                : 'Peso editable (fijo hasta que llegue AT+INICIO)',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.75),
                 ),
           ),
           const SizedBox(height: 10),

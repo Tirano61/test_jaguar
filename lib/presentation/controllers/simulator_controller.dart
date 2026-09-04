@@ -7,6 +7,7 @@ import 'package:test_jaguar/application/use_cases/set_error_ecu_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_manual_measurement_use_case.dart';
 import 'package:test_jaguar/application/use_cases/observe_simulator_status_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_humidity_use_case.dart';
+import 'package:test_jaguar/application/use_cases/set_hydraulic_peso_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_send_protocol_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_st456_screen_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_toma_fuerza_use_case.dart';
@@ -31,6 +32,7 @@ class SimulatorController extends ChangeNotifier {
     required SetTomaFuerzaUseCase setTomaFuerzaUseCase,
     required SetErrorEcuUseCase setErrorEcuUseCase,
     required SendGuardarEventUseCase sendGuardarEventUseCase,
+    required SetHydraulicPesoUseCase setHydraulicPesoUseCase,
   })  : _startSimulationUseCase = startSimulationUseCase,
         _stopSimulationUseCase = stopSimulationUseCase,
         _observeStatusUseCase = observeStatusUseCase,
@@ -40,7 +42,8 @@ class SimulatorController extends ChangeNotifier {
         _setManualMeasurementUseCase = setManualMeasurementUseCase,
         _setTomaFuerzaUseCase = setTomaFuerzaUseCase,
         _setErrorEcuUseCase = setErrorEcuUseCase,
-        _sendGuardarEventUseCase = sendGuardarEventUseCase {
+        _sendGuardarEventUseCase = sendGuardarEventUseCase,
+        _setHydraulicPesoUseCase = setHydraulicPesoUseCase {
     _bind();
   }
 
@@ -54,6 +57,7 @@ class SimulatorController extends ChangeNotifier {
   final SetTomaFuerzaUseCase _setTomaFuerzaUseCase;
   final SetErrorEcuUseCase _setErrorEcuUseCase;
   final SendGuardarEventUseCase _sendGuardarEventUseCase;
+  final SetHydraulicPesoUseCase _setHydraulicPesoUseCase;
 
   StreamSubscription<SimulatorStatusDto>? _statusSubscription;
 
@@ -83,6 +87,8 @@ class SimulatorController extends ChangeNotifier {
   Future<void> setErrorEcu(String value) => _setErrorEcuUseCase(value);
 
   Future<void> sendGuardarEvent() => _sendGuardarEventUseCase();
+
+  Future<void> setHydraulicPeso(int value) => _setHydraulicPesoUseCase(value);
 
   Future<void> setManualTara(double value) =>
       _updateManualMeasurement(tara: value.round().clamp(0, 22000));
