@@ -51,6 +51,28 @@ class HydraulicSimulatorPage extends StatelessWidget {
               connected: state.connected,
             ),
             const SizedBox(height: 4),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed:
+                        state.running ? null : () => controller.startSimulation(),
+                    icon: const Icon(Icons.play_arrow_rounded),
+                    label: const Text('Iniciar'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed:
+                        state.running ? () => controller.stopSimulation() : null,
+                    icon: const Icon(Icons.stop_rounded),
+                    label: const Text('Detener'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
             _HydraulicDiagramCard(
               tuboAbierto: state.tuboAbierto,
               guillotinaAbierta: state.guillotinaAbierta,
