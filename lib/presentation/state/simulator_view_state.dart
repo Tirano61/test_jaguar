@@ -1,3 +1,4 @@
+import 'package:test_jaguar/domain/value_objects/hydraulic_actuator_position.dart';
 import 'package:test_jaguar/domain/value_objects/hydraulic_discharge_command.dart';
 import 'package:test_jaguar/domain/value_objects/hydraulic_movement_command.dart';
 import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
@@ -36,8 +37,8 @@ class SimulatorViewState {
     required this.logs,
     required this.tomaFuerza,
     required this.errorEcu,
-    required this.tuboAbierto,
-    required this.guillotinaAbierta,
+    required this.tuboPosicion,
+    required this.guillotinaPosicion,
     required this.hydraulicDischargeActive,
     required this.hydraulicInitialPeso,
     required this.hydraulicTargetPeso,
@@ -76,8 +77,12 @@ class SimulatorViewState {
   final List<String> logs;
   final int tomaFuerza;
   final String errorEcu;
-  final bool tuboAbierto;
-  final bool guillotinaAbierta;
+  /// Posición del tubo en pasos (`HydraulicActuatorPosition.closed` ..
+  /// `HydraulicActuatorPosition.open`).
+  final int tuboPosicion;
+
+  /// Posición de la guillotina en pasos (misma escala que [tuboPosicion]).
+  final int guillotinaPosicion;
   final bool hydraulicDischargeActive;
   final double hydraulicInitialPeso;
   final double hydraulicTargetPeso;
@@ -116,8 +121,8 @@ class SimulatorViewState {
     logs: <String>[],
     tomaFuerza: 0,
     errorEcu: '',
-    tuboAbierto: false,
-    guillotinaAbierta: false,
+    tuboPosicion: HydraulicActuatorPosition.closed,
+    guillotinaPosicion: HydraulicActuatorPosition.closed,
     hydraulicDischargeActive: false,
     hydraulicInitialPeso: 0.0,
     hydraulicTargetPeso: 0.0,
@@ -155,8 +160,8 @@ class SimulatorViewState {
     List<String>? logs,
     int? tomaFuerza,
     String? errorEcu,
-    bool? tuboAbierto,
-    bool? guillotinaAbierta,
+    int? tuboPosicion,
+    int? guillotinaPosicion,
     bool? hydraulicDischargeActive,
     double? hydraulicInitialPeso,
     double? hydraulicTargetPeso,
@@ -197,8 +202,8 @@ class SimulatorViewState {
       logs: logs ?? this.logs,
       tomaFuerza: tomaFuerza ?? this.tomaFuerza,
       errorEcu: errorEcu ?? this.errorEcu,
-      tuboAbierto: tuboAbierto ?? this.tuboAbierto,
-      guillotinaAbierta: guillotinaAbierta ?? this.guillotinaAbierta,
+      tuboPosicion: tuboPosicion ?? this.tuboPosicion,
+      guillotinaPosicion: guillotinaPosicion ?? this.guillotinaPosicion,
       hydraulicDischargeActive:
           hydraulicDischargeActive ?? this.hydraulicDischargeActive,
       hydraulicInitialPeso: hydraulicInitialPeso ?? this.hydraulicInitialPeso,

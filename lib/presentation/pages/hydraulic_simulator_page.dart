@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:test_jaguar/domain/value_objects/hydraulic_actuator_position.dart';
 import 'package:test_jaguar/domain/value_objects/hydraulic_discharge_command.dart';
 import 'package:test_jaguar/domain/value_objects/hydraulic_movement_command.dart';
 import 'package:test_jaguar/presentation/controllers/simulator_controller.dart';
@@ -74,8 +75,9 @@ class HydraulicSimulatorPage extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             _HydraulicDiagramCard(
-              tuboAbierto: state.tuboAbierto,
-              guillotinaAbierta: state.guillotinaAbierta,
+              tuboPosicion: state.tuboPosicion,
+              guillotinaPosicion: state.guillotinaPosicion,
+              dischargeActive: state.hydraulicDischargeActive,
             ),
             const SizedBox(height: 4),
             _HydraulicWeightCard(
@@ -160,29 +162,56 @@ class HydraulicSimulatorPage extends StatelessWidget {
 
 class _HydraulicDiagramCard extends StatelessWidget {
   const _HydraulicDiagramCard({
-    required this.tuboAbierto,
-    required this.guillotinaAbierta,
+    required this.tuboPosicion,
+    required this.guillotinaPosicion,
+    required this.dischargeActive,
   });
 
-  final bool tuboAbierto;
-  final bool guillotinaAbierta;
+  final int tuboPosicion;
+  final int guillotinaPosicion;
+  final bool dischargeActive;
 
   @override
   Widget build(BuildContext context) {
     return SectionCard(
       title: 'Diagrama hidráulico (tolva → tubo → guillotina)',
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          _ActuatorIndicator(
+          _ActuatorPositionBar(
             label: 'Tubo',
-            open: tuboAbierto,
             icon: Icons.horizontal_rule_rounded,
+            position: tuboPosicion,
           ),
-          const SizedBox(width: 12),
-          _ActuatorIndicator(
+          const SizedBox(height: 14),
+          _ActuatorPositionBar(
             label: 'Guillotina',
-            open: guillotinaAbierta,
             icon: Icons.vertical_align_bottom_rounded,
+            position: guillotinaPosicion,
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: <Widget>[
+              Icon(
+                dischargeActive ? Icons.lock_rounded : Icons.tune_rounded,
+                size: 16,
+                color: const Color(0xFF3A5E56),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  dischargeActive
+                      ? 'Descarga en curso: los AT+MOVIMIENTO de abrir/cerrar '
+                          'se ignoran'
+                      : 'Cada AT+MOVIMIENTO mueve un paso '
+                          '(${HydraulicActuatorPosition.steps} pasos entre '
+                          'cerrado y abierto)',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: const Color(0xFF3A5E56),
+                      ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -190,46 +219,138 @@ class _HydraulicDiagramCard extends StatelessWidget {
   }
 }
 
-class _ActuatorIndicator extends StatelessWidget {
-  const _ActuatorIndicator({
+/// Barra gruesa que muestra en qué paso quedó el actuador entre los topes
+/// "cerrado" y "abierto".
+class _ActuatorPositionBar extends StatelessWidget {
+  const _ActuatorPositionBar({
     required this.label,
-    required this.open,
     required this.icon,
+    required this.position,
   });
 
   final String label;
-  final bool open;
   final IconData icon;
+  final int position;
+
+  static const Color _closedColor = Color(0xFFB3261E);
+  static const Color _partialColor = Color(0xFFB26A00);
+  static const Color _openColor = Color(0xFF1E8C74);
 
   @override
   Widget build(BuildContext context) {
-    final Color color =
-        open ? const Color(0xFF1E8C74) : const Color(0xFFB3261E);
+    final int step = HydraulicActuatorPosition.clamp(position);
+    final Color color;
+    if (HydraulicActuatorPosition.isClosed(step)) {
+      color = _closedColor;
+    } else if (HydraulicActuatorPosition.isFullyOpen(step)) {
+      color = _openColor;
+    } else {
+      color = _partialColor;
+    }
 
-    return Expanded(
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color, width: 1.4),
-        ),
-        child: Column(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Row(
           children: <Widget>[
-            Icon(icon, color: color, size: 30),
-            const SizedBox(height: 8),
+            Icon(icon, color: color, size: 20),
+            const SizedBox(width: 6),
+            Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+            const Spacer(),
             Text(
-              label,
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              open ? 'ABIERTO' : 'CERRADO',
+              '${HydraulicActuatorPosition.label(step)} '
+              '($step/${HydraulicActuatorPosition.steps})',
               style: TextStyle(color: color, fontWeight: FontWeight.w800),
             ),
           ],
         ),
+        const SizedBox(height: 6),
+        Container(
+          height: 28,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: color.withValues(alpha: 0.55), width: 1.4),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            children: <Widget>[
+              Positioned.fill(
+                child: TweenAnimationBuilder<double>(
+                  duration: const Duration(milliseconds: 280),
+                  curve: Curves.easeOut,
+                  tween: Tween<double>(
+                    end: HydraulicActuatorPosition.fraction(step),
+                  ),
+                  builder: (BuildContext context, double value, Widget? _) {
+                    return FractionallySizedBox(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: value,
+                      child: ColoredBox(color: color),
+                    );
+                  },
+                ),
+              ),
+              Positioned.fill(child: _StepTicks(filledSteps: step)),
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: <Widget>[
+            Text(
+              'Cerrado',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: const Color(0xFF3A5E56),
+                  ),
+            ),
+            Text(
+              'Abierto',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: const Color(0xFF3A5E56),
+                  ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Divisiones internas de la barra: una por cada paso intermedio. Las que
+/// caen sobre la parte ya recorrida se dibujan claras y el resto oscuras,
+/// para que se lean sobre el relleno y sobre el fondo.
+class _StepTicks extends StatelessWidget {
+  const _StepTicks({required this.filledSteps});
+
+  final int filledSteps;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: List<Widget>.generate(
+        HydraulicActuatorPosition.steps,
+        (int index) {
+          final bool isLast = index == HydraulicActuatorPosition.steps - 1;
+          final bool overFill = index + 1 <= filledSteps;
+          return Expanded(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: isLast
+                  ? const SizedBox.shrink()
+                  : SizedBox(
+                      width: 1.5,
+                      height: double.infinity,
+                      child: ColoredBox(
+                        color: overFill
+                            ? Colors.white.withValues(alpha: 0.75)
+                            : const Color(0xFF0B3D35).withValues(alpha: 0.22),
+                      ),
+                    ),
+            ),
+          );
+        },
       ),
     );
   }

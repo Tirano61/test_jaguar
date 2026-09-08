@@ -10,6 +10,7 @@ import 'package:test_jaguar/domain/entities/ble_peripheral_status.dart';
 import 'package:test_jaguar/domain/entities/scale_measurement.dart';
 import 'package:test_jaguar/domain/repositories/ble_peripheral_repository.dart';
 import 'package:test_jaguar/domain/repositories/scale_simulation_repository.dart';
+import 'package:test_jaguar/domain/value_objects/hydraulic_actuator_position.dart';
 import 'package:test_jaguar/domain/value_objects/hydraulic_discharge_command.dart';
 import 'package:test_jaguar/domain/value_objects/hydraulic_movement_command.dart';
 import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
@@ -66,8 +67,10 @@ class SimulatorOrchestrator {
   ScaleMeasurement _hydraulicMeasurement = ScaleMeasurement.baseline;
   int _tomaFuerza = 0;
   String _errorEcu = '';
-  bool _tuboAbierto = false;
-  bool _guillotinaAbierta = false;
+  // Posición de cada actuador en pasos discretos (0 cerrado .. 5 abierto):
+  // cada AT+MOVIMIENTO mueve un paso hasta el tope correspondiente.
+  int _tuboPosicion = HydraulicActuatorPosition.closed;
+  int _guillotinaPosicion = HydraulicActuatorPosition.closed;
   HydraulicDischargeCommand? _lastHydraulicInicio;
   HydraulicMovementCommand? _lastHydraulicMovimiento;
   bool _hydraulicDischargeActive = false;
@@ -126,8 +129,8 @@ class SimulatorOrchestrator {
       _hydraulicInitialPeso = 0.0;
       _hydraulicTargetPeso = 0.0;
       _hydraulicDecrementPerTick = 0.0;
-      _tuboAbierto = false;
-      _guillotinaAbierta = false;
+      _tuboPosicion = HydraulicActuatorPosition.closed;
+      _guillotinaPosicion = HydraulicActuatorPosition.closed;
     }
 
     _emit(_withHydraulicSnapshot(_current.copyWith(sendProtocol: _sendProtocol)));
@@ -344,8 +347,8 @@ class SimulatorOrchestrator {
     return value.copyWith(
       tomaFuerza: _tomaFuerza,
       errorEcu: _errorEcu,
-      tuboAbierto: _tuboAbierto,
-      guillotinaAbierta: _guillotinaAbierta,
+      tuboPosicion: _tuboPosicion,
+      guillotinaPosicion: _guillotinaPosicion,
       hydraulicDischargeActive: _hydraulicDischargeActive,
       hydraulicInitialPeso: _hydraulicInitialPeso,
       hydraulicTargetPeso: _hydraulicTargetPeso,
@@ -684,7 +687,19 @@ class SimulatorOrchestrator {
     _hydraulicDecrementPerTick = _hydraulicRateForVelocidad(command.velocidad);
     _hydraulicDischargeActive = true;
 
-    _pushLog('AT+INICIO recibido: ${command.summary}');
+    // Al descargar el tubo queda totalmente abierto y la guillotina en alguna
+    // posición que no sea "cerrada": si venía cerrada se la lleva al primer
+    // paso de apertura, si ya estaba abierta se respeta donde la dejaron.
+    _tuboPosicion = HydraulicActuatorPosition.open;
+    if (HydraulicActuatorPosition.isClosed(_guillotinaPosicion)) {
+      _guillotinaPosicion = HydraulicActuatorPosition.firstOpenStep;
+    }
+
+    _pushLog(
+      'AT+INICIO recibido: ${command.summary} -> tubo '
+      '${HydraulicActuatorPosition.label(_tuboPosicion)}, guillotina '
+      '${HydraulicActuatorPosition.label(_guillotinaPosicion)}',
+    );
     await _sendCurrentPayloadNow();
   }
 
@@ -693,14 +708,42 @@ class SimulatorOrchestrator {
   ) async {
     _lastHydraulicMovimiento = command;
 
-    final bool? opens = command.opens;
-    if (command.affectsTube && opens != null) {
-      _tuboAbierto = opens;
-    } else if (command.affectsGuillotine && opens != null) {
-      _guillotinaAbierta = opens;
+    // Durante una descarga las posiciones las maneja la descarga misma: los
+    // abrir/cerrar de tubo y guillotina se ignoran hasta que termine.
+    if (_hydraulicDischargeActive) {
+      _pushLog(
+        'AT+MOVIMIENTO recibido: ${command.label} (tipo=${command.tipo}) -> '
+        'ignorado, hay una descarga en curso',
+      );
+      await _sendCurrentPayloadNow();
+      return;
     }
 
-    _pushLog('AT+MOVIMIENTO recibido: ${command.label} (tipo=${command.tipo})');
+    final bool? opens = command.opens;
+    if (opens != null && command.affectsTube) {
+      _tuboPosicion = HydraulicActuatorPosition.stepped(
+        _tuboPosicion,
+        opening: opens,
+      );
+      _pushLog(
+        'AT+MOVIMIENTO recibido: ${command.label} (tipo=${command.tipo}) -> '
+        'tubo en ${HydraulicActuatorPosition.label(_tuboPosicion)}',
+      );
+    } else if (opens != null && command.affectsGuillotine) {
+      _guillotinaPosicion = HydraulicActuatorPosition.stepped(
+        _guillotinaPosicion,
+        opening: opens,
+      );
+      _pushLog(
+        'AT+MOVIMIENTO recibido: ${command.label} (tipo=${command.tipo}) -> '
+        'guillotina en ${HydraulicActuatorPosition.label(_guillotinaPosicion)}',
+      );
+    } else {
+      _pushLog(
+        'AT+MOVIMIENTO recibido: ${command.label} (tipo=${command.tipo})',
+      );
+    }
+
     await _sendCurrentPayloadNow();
   }
 
