@@ -43,12 +43,21 @@ Validaciones:
 - kgDescarga > kgTubo
 - kgDescarga < peso actual en tolva
 
-### 4.3 Evento de guardado
+### 4.3 Comando de detención de descarga
+
+AT+DETENER\r\n
+
+- Corta la descarga en curso: el peso queda congelado donde estaba.
+- No dispara AT+GUARDAR (la descarga no alcanzó el objetivo).
+- Tubo y guillotina quedan en su posición y vuelven a aceptar AT+MOVIMIENTO.
+- Si no hay descarga en curso, se ignora.
+
+### 4.4 Evento de guardado
 
 - Entrada por notify BLE: AT+GUARDAR
 - Compatibilidad recomendada de parser: AT+GUARDAR, AT+GUARDAR() y variantes con espacios.
 
-### 4.4 Movimiento manual
+### 4.5 Movimiento manual
 
 AT+MOVIMIENTO=<tipo>\r\n
 
