@@ -38,6 +38,7 @@ class SimulatorOrchestrator {
   static const String _resetHoldCommand = 'AT+RSTHOLD';
   static const String _toggleTareCommand = 'AT+TARA';
   static const String _zeroWeightCommand = 'AT+CERO';
+  static const String _stopDischargeCommand = 'AT+DETENER';
 
   SendProtocol _sendProtocol = SendProtocol.jaguarBle;
   St456Screen _st456Screen = St456Screen.main;
@@ -635,6 +636,18 @@ class SimulatorOrchestrator {
       return;
     }
 
+    if (_isStopDischargeCommand(normalizedCommand)) {
+      if (_sendProtocol == SendProtocol.hidraulicoBle) {
+        await _applyHydraulicDetener();
+      } else {
+        _pushLog(
+          'AT+DETENER recibido pero se ignora: seleccioná "Hidráulico BLE" '
+          'para procesarlo.',
+        );
+      }
+      return;
+    }
+
     final HydraulicDischargeCommand? inicio =
         HydraulicDischargeCommand.tryParse(normalizedCommand);
     if (inicio != null) {
@@ -699,6 +712,34 @@ class SimulatorOrchestrator {
       'AT+INICIO recibido: ${command.summary} -> tubo '
       '${HydraulicActuatorPosition.label(_tuboPosicion)}, guillotina '
       '${HydraulicActuatorPosition.label(_guillotinaPosicion)}',
+    );
+    await _sendCurrentPayloadNow();
+  }
+
+  /// `AT+DETENER` corta la descarga simulada en curso: el peso queda congelado
+  /// donde estaba y **no** se envía `AT+GUARDAR` (la descarga se interrumpió,
+  /// no alcanzó el objetivo). Los actuadores quedan en la posición en la que
+  /// estaban y vuelven a responder a `AT+MOVIMIENTO`.
+  Future<void> _applyHydraulicDetener() async {
+    if (!_hydraulicDischargeActive) {
+      _pushLog('AT+DETENER recibido: no hay descarga en curso');
+      await _sendCurrentPayloadNow();
+      return;
+    }
+
+    _hydraulicDischargeActive = false;
+    _hydraulicJustCompleted = false;
+    // Mientras la descarga corre el peso vive en
+    // _hydraulicCurrentDisplayedPeso: hay que fijarlo en la medición del modo
+    // o el próximo tick volvería al peso previo al AT+INICIO.
+    _hydraulicMeasurement = _hydraulicMeasurement.copyWith(
+      peso: _hydraulicCurrentDisplayedPeso.round(),
+    );
+
+    _pushLog(
+      'AT+DETENER recibido: descarga interrumpida en '
+      '${_hydraulicMeasurement.peso} kg (objetivo '
+      '${_hydraulicTargetPeso.round()} kg), no se envía AT+GUARDAR',
     );
     await _sendCurrentPayloadNow();
   }
@@ -780,6 +821,13 @@ class SimulatorOrchestrator {
 
   bool _isZeroWeightCommand(String normalizedCommand) =>
       normalizedCommand == _zeroWeightCommand || normalizedCommand == 'CERO';
+
+  // Comando sin parámetros: se acepta pelado y también con el `=` del nuevo
+  // formato del protocolo hidráulico, por si la app lo manda igual que el
+  // resto (AT+DETENER=).
+  bool _isStopDischargeCommand(String normalizedCommand) =>
+      normalizedCommand == _stopDischargeCommand ||
+      normalizedCommand == '$_stopDischargeCommand=';
 
   List<String> _logsForBleStatusChange({
     required BlePeripheralStatus previous,
