@@ -1,4 +1,4 @@
-/// Comando `AT+MOVIMIENTO(<tipo>)` recibido por characteristic write en el
+/// Comando `AT+MOVIMIENTO=<tipo>` recibido por characteristic write en el
 /// modo Hidráulico BLE.
 ///
 /// tipo: 1 abrir tubo, 2 cerrar tubo, 3 abrir guillotina, 4 cerrar guillotina.
@@ -7,7 +7,7 @@ class HydraulicMovementCommand {
 
   final int tipo;
 
-  static final RegExp _pattern = RegExp(r'^AT\+MOVIMIENTO\((\d+)\)$');
+  static final RegExp _pattern = RegExp(r'^AT\+MOVIMIENTO=(\d+)$');
 
   /// [normalizedCommand] debe venir ya en mayúsculas y sin espacios/CRLF
   /// (mismo formato que produce `_normalizeIncomingCommand` en el
