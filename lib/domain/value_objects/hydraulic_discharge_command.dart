@@ -1,4 +1,4 @@
-/// Comando `AT+INICIO(<kgDescarga>,<kgTubo>,<kgPrecierre>,<modo>,<velocidad>)`
+/// Comando `AT+INICIO=<kgDescarga>,<kgTubo>,<kgPrecierre>,<modo>,<velocidad>`
 /// recibido por characteristic write en el modo Hidráulico BLE.
 class HydraulicDischargeCommand {
   const HydraulicDischargeCommand({
@@ -16,7 +16,7 @@ class HydraulicDischargeCommand {
   final int velocidad;
 
   static final RegExp _pattern =
-      RegExp(r'^AT\+INICIO\((-?\d+),(-?\d+),(-?\d+),(\d+),(\d+)\)$');
+      RegExp(r'^AT\+INICIO=(-?\d+),(-?\d+),(-?\d+),(\d+),(\d+)$');
 
   /// [normalizedCommand] debe venir ya en mayúsculas y sin espacios/CRLF
   /// (mismo formato que produce `_normalizeIncomingCommand` en el

@@ -31,7 +31,7 @@ Incorporar un nuevo modo de descarga para BLE en el que la balanza controla hidr
 
 ### 4.2 Comando de inicio de descarga
 
-AT+INICIO(<kgDescarga>,<kgTubo>,<kgPrecierre>,<modo>,<velocidad>)\r\n
+AT+INICIO=<kgDescarga>,<kgTubo>,<kgPrecierre>,<modo>,<velocidad>\r\n
 
 Mapeos:
 
@@ -50,7 +50,7 @@ Validaciones:
 
 ### 4.4 Movimiento manual
 
-AT+MOVIMIENTO(<tipo>)\r\n
+AT+MOVIMIENTO=<tipo>\r\n
 
 - 1 abrir tubo
 - 2 cerrar tubo
