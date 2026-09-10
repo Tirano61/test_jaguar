@@ -13,6 +13,7 @@ import 'package:test_jaguar/domain/repositories/scale_simulation_repository.dart
 import 'package:test_jaguar/domain/value_objects/hydraulic_actuator_position.dart';
 import 'package:test_jaguar/domain/value_objects/hydraulic_discharge_command.dart';
 import 'package:test_jaguar/domain/value_objects/hydraulic_movement_command.dart';
+import 'package:test_jaguar/domain/value_objects/hydraulic_pto.dart';
 import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
 import 'package:test_jaguar/domain/value_objects/st456_screen.dart';
 
@@ -67,7 +68,10 @@ class SimulatorOrchestrator {
   // AT+INICIO/AT+GUARDAR, no el sensor. peso solo cambia si el tester lo
   // edita a mano o por una descarga activa iniciada con AT+INICIO.
   ScaleMeasurement _hydraulicMeasurement = ScaleMeasurement.baseline;
-  int _tomaFuerza = 0;
+  int _tomaFuerza = HydraulicPtoState.off;
+  // RPM simuladas de la toma de fuerza: se configuran siempre, pero solo
+  // salen en el JSON cuando _tomaFuerza está en encendida.
+  int _tomaFuerzaRpm = HydraulicPtoRpm.defaultValue;
   String _errorEcu = '';
   // Posición de cada actuador en pasos discretos (0 cerrado .. 5 abierto):
   // cada AT+MOVIMIENTO mueve un paso hasta el tope correspondiente.
@@ -159,12 +163,38 @@ class SimulatorOrchestrator {
   }
 
   Future<void> setTomaFuerza(int value) async {
-    final int next = value.clamp(0, 3);
+    final int next = value.clamp(
+      HydraulicPtoState.off,
+      HydraulicPtoState.requestOff,
+    );
     if (_tomaFuerza == next) {
       return;
     }
     _tomaFuerza = next;
-    _pushLog('Toma de fuerza configurada: $_tomaFuerza');
+    final int rpmEnviadas =
+        HydraulicPtoState.isOn(_tomaFuerza) ? _tomaFuerzaRpm : 0;
+    _pushLog(
+      'Toma de fuerza configurada: $_tomaFuerza '
+      '(rpm enviadas: $rpmEnviadas)',
+    );
+    await _sendCurrentPayloadNow();
+  }
+
+  /// RPM simuladas de la toma de fuerza. Se pueden configurar en cualquier
+  /// estado, pero el JSON solo las manda con la toma de fuerza encendida.
+  Future<void> setTomaFuerzaRpm(int value) async {
+    final int next = HydraulicPtoRpm.clamp(value);
+    if (_tomaFuerzaRpm == next) {
+      return;
+    }
+    _tomaFuerzaRpm = next;
+    _pushLog(
+      HydraulicPtoState.isOn(_tomaFuerza)
+          ? 'RPM toma de fuerza configuradas: $_tomaFuerzaRpm'
+          : 'RPM toma de fuerza configuradas: $_tomaFuerzaRpm '
+              '(se envía rpm: 0 hasta que tomaFuerza sea '
+              '${HydraulicPtoState.on})',
+    );
     await _sendCurrentPayloadNow();
   }
 
@@ -353,6 +383,7 @@ class SimulatorOrchestrator {
   SimulatorStatusDto _withHydraulicSnapshot(SimulatorStatusDto value) {
     return value.copyWith(
       tomaFuerza: _tomaFuerza,
+      tomaFuerzaRpm: _tomaFuerzaRpm,
       errorEcu: _errorEcu,
       tuboPosicion: _tuboPosicion,
       guillotinaPosicion: _guillotinaPosicion,
@@ -370,6 +401,7 @@ class SimulatorOrchestrator {
       return HydraulicPayloadDto(
         measurement: measurement,
         tomaFuerza: _tomaFuerza,
+        tomaFuerzaRpm: _tomaFuerzaRpm,
         errorEcu: _errorEcu,
       ).toJsonUtf8String();
     }

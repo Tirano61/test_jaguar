@@ -27,7 +27,10 @@ Incorporar un nuevo modo de descarga para BLE en el que la balanza controla hidr
 ### 4.1 Campos JSON adicionales
 
 - tomaFuerza: int (0 apagada, 1 encendida, 2 encienda toma de fuerza, 3 apague toma de fuerza)
+- rpm: int (rpm de la toma de fuerza; solo con tomaFuerza = 1, en el resto de los estados va 0)
 - errorEcu: string
+
+Rango simulable de rpm: 200 a 1200.
 
 ### 4.2 Comando de inicio de descarga
 

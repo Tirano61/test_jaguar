@@ -1,6 +1,7 @@
 import 'package:test_jaguar/domain/value_objects/hydraulic_actuator_position.dart';
 import 'package:test_jaguar/domain/value_objects/hydraulic_discharge_command.dart';
 import 'package:test_jaguar/domain/value_objects/hydraulic_movement_command.dart';
+import 'package:test_jaguar/domain/value_objects/hydraulic_pto.dart';
 import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
 import 'package:test_jaguar/domain/value_objects/st456_screen.dart';
 
@@ -36,6 +37,7 @@ class SimulatorViewState {
     required this.lastJson,
     required this.logs,
     required this.tomaFuerza,
+    required this.tomaFuerzaRpm,
     required this.errorEcu,
     required this.tuboPosicion,
     required this.guillotinaPosicion,
@@ -77,6 +79,10 @@ class SimulatorViewState {
   final String lastJson;
   final List<String> logs;
   final int tomaFuerza;
+
+  /// RPM simuladas de la toma de fuerza (solo viajan en el JSON con la
+  /// toma de fuerza encendida).
+  final int tomaFuerzaRpm;
   final String errorEcu;
   /// Posición del tubo en pasos (`HydraulicActuatorPosition.closed` ..
   /// `HydraulicActuatorPosition.open`).
@@ -124,7 +130,8 @@ class SimulatorViewState {
     characteristicWriteUuid: '',
     lastJson: '{}',
     logs: <String>[],
-    tomaFuerza: 0,
+    tomaFuerza: HydraulicPtoState.off,
+    tomaFuerzaRpm: HydraulicPtoRpm.defaultValue,
     errorEcu: '',
     tuboPosicion: HydraulicActuatorPosition.closed,
     guillotinaPosicion: HydraulicActuatorPosition.closed,
@@ -165,6 +172,7 @@ class SimulatorViewState {
     String? lastJson,
     List<String>? logs,
     int? tomaFuerza,
+    int? tomaFuerzaRpm,
     String? errorEcu,
     int? tuboPosicion,
     int? guillotinaPosicion,
@@ -208,6 +216,7 @@ class SimulatorViewState {
       lastJson: lastJson ?? this.lastJson,
       logs: logs ?? this.logs,
       tomaFuerza: tomaFuerza ?? this.tomaFuerza,
+      tomaFuerzaRpm: tomaFuerzaRpm ?? this.tomaFuerzaRpm,
       errorEcu: errorEcu ?? this.errorEcu,
       tuboPosicion: tuboPosicion ?? this.tuboPosicion,
       guillotinaPosicion: guillotinaPosicion ?? this.guillotinaPosicion,
