@@ -184,6 +184,7 @@ class SimulatorController extends ChangeNotifier {
         tuboPosicion: status.tuboPosicion,
         guillotinaPosicion: status.guillotinaPosicion,
         hydraulicDischargeActive: status.hydraulicDischargeActive,
+        hydraulicDischargePaused: status.hydraulicDischargePaused,
         hydraulicInitialPeso: status.hydraulicInitialPeso,
         hydraulicTargetPeso: status.hydraulicTargetPeso,
         lastHydraulicInicio: status.lastHydraulicInicio,

@@ -78,11 +78,13 @@ class HydraulicSimulatorPage extends StatelessWidget {
               tuboPosicion: state.tuboPosicion,
               guillotinaPosicion: state.guillotinaPosicion,
               dischargeActive: state.hydraulicDischargeActive,
+              dischargePaused: state.hydraulicDischargePaused,
             ),
             const SizedBox(height: 4),
             _HydraulicWeightCard(
               weight: state.weight,
               dischargeActive: state.hydraulicDischargeActive,
+              dischargePaused: state.hydraulicDischargePaused,
               initialPeso: state.hydraulicInitialPeso,
               targetPeso: state.hydraulicTargetPeso,
               humidity: state.humidity,
@@ -165,11 +167,13 @@ class _HydraulicDiagramCard extends StatelessWidget {
     required this.tuboPosicion,
     required this.guillotinaPosicion,
     required this.dischargeActive,
+    required this.dischargePaused,
   });
 
   final int tuboPosicion;
   final int guillotinaPosicion;
   final bool dischargeActive;
+  final bool dischargePaused;
 
   @override
   Widget build(BuildContext context) {
@@ -193,7 +197,11 @@ class _HydraulicDiagramCard extends StatelessWidget {
           Row(
             children: <Widget>[
               Icon(
-                dischargeActive ? Icons.lock_rounded : Icons.tune_rounded,
+                dischargeActive
+                    ? (dischargePaused
+                        ? Icons.pause_circle_outline_rounded
+                        : Icons.lock_rounded)
+                    : Icons.tune_rounded,
                 size: 16,
                 color: const Color(0xFF3A5E56),
               ),
@@ -201,8 +209,12 @@ class _HydraulicDiagramCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   dischargeActive
-                      ? 'Descarga en curso: los AT+MOVIMIENTO de abrir/cerrar '
-                          'se ignoran'
+                      ? (dischargePaused
+                          ? 'Descarga pausada por AT+DETENER: los '
+                              'AT+MOVIMIENTO siguen ignorándose hasta '
+                              'AT+REANUDAR'
+                          : 'Descarga en curso: los AT+MOVIMIENTO de '
+                              'abrir/cerrar se ignoran')
                       : 'Cada AT+MOVIMIENTO mueve un paso '
                           '(${HydraulicActuatorPosition.steps} pasos entre '
                           'cerrado y abierto)',
@@ -360,6 +372,7 @@ class _HydraulicWeightCard extends StatelessWidget {
   const _HydraulicWeightCard({
     required this.weight,
     required this.dischargeActive,
+    required this.dischargePaused,
     required this.initialPeso,
     required this.targetPeso,
     required this.humidity,
@@ -369,6 +382,7 @@ class _HydraulicWeightCard extends StatelessWidget {
 
   final int weight;
   final bool dischargeActive;
+  final bool dischargePaused;
   final double initialPeso;
   final double targetPeso;
   final double humidity;
@@ -445,7 +459,9 @@ class _HydraulicWeightCard extends StatelessWidget {
           ),
           Text(
             dischargeActive
-                ? 'El peso lo maneja la descarga en curso'
+                ? (dischargePaused
+                    ? 'Peso congelado: descarga pausada por AT+DETENER'
+                    : 'El peso lo maneja la descarga en curso')
                 : 'Peso editable (fijo hasta que llegue AT+INICIO)',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Colors.white.withValues(alpha: 0.75),
@@ -454,7 +470,11 @@ class _HydraulicWeightCard extends StatelessWidget {
           const SizedBox(height: 10),
           if (dischargeActive) ...<Widget>[
             Text(
-              'Descarga hidráulica en curso -> objetivo ${targetPeso.round()} kg',
+              dischargePaused
+                  ? 'Descarga hidráulica pausada -> objetivo '
+                      '${targetPeso.round()} kg (esperando AT+REANUDAR)'
+                  : 'Descarga hidráulica en curso -> objetivo '
+                      '${targetPeso.round()} kg',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Colors.white.withValues(alpha: 0.92),
                     fontWeight: FontWeight.w700,

@@ -43,21 +43,32 @@ Validaciones:
 - kgDescarga > kgTubo
 - kgDescarga < peso actual en tolva
 
-### 4.3 Comando de detención de descarga
+### 4.3 Comando de pausa de descarga
 
 AT+DETENER\r\n
 
-- Corta la descarga en curso: el peso queda congelado donde estaba.
-- No dispara AT+GUARDAR (la descarga no alcanzó el objetivo).
-- Tubo y guillotina quedan en su posición y vuelven a aceptar AT+MOVIMIENTO.
-- Si no hay descarga en curso, se ignora.
+- Pausa la descarga en curso: el peso queda congelado donde estaba.
+- No cancela la descarga: se conservan kg objetivo y velocidad del AT+INICIO.
+- No dispara AT+GUARDAR (la descarga todavía no alcanzó el objetivo).
+- Tubo y guillotina quedan en su posición y siguen ignorando AT+MOVIMIENTO,
+  porque la descarga sigue en curso (pausada).
+- Si no hay descarga en curso, o ya estaba pausada, se ignora.
 
-### 4.4 Evento de guardado
+### 4.4 Comando de reanudación de descarga
+
+AT+REANUDAR\r\n
+
+- Continúa la descarga pausada por AT+DETENER desde el peso en el que quedó.
+- Mantiene el mismo objetivo y la misma velocidad del AT+INICIO original.
+- Al alcanzar el objetivo dispara AT+GUARDAR como cualquier descarga completa.
+- Si no hay descarga pausada, se ignora.
+
+### 4.5 Evento de guardado
 
 - Entrada por notify BLE: AT+GUARDAR
 - Compatibilidad recomendada de parser: AT+GUARDAR, AT+GUARDAR() y variantes con espacios.
 
-### 4.5 Movimiento manual
+### 4.6 Movimiento manual
 
 AT+MOVIMIENTO=<tipo>\r\n
 

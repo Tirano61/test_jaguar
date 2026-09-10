@@ -40,6 +40,7 @@ class SimulatorViewState {
     required this.tuboPosicion,
     required this.guillotinaPosicion,
     required this.hydraulicDischargeActive,
+    required this.hydraulicDischargePaused,
     required this.hydraulicInitialPeso,
     required this.hydraulicTargetPeso,
     this.lastHydraulicInicio,
@@ -84,6 +85,10 @@ class SimulatorViewState {
   /// Posición de la guillotina en pasos (misma escala que [tuboPosicion]).
   final int guillotinaPosicion;
   final bool hydraulicDischargeActive;
+
+  /// Descarga en curso pero pausada por `AT+DETENER`: el peso queda
+  /// congelado hasta que llegue `AT+REANUDAR`.
+  final bool hydraulicDischargePaused;
   final double hydraulicInitialPeso;
   final double hydraulicTargetPeso;
   final HydraulicDischargeCommand? lastHydraulicInicio;
@@ -124,6 +129,7 @@ class SimulatorViewState {
     tuboPosicion: HydraulicActuatorPosition.closed,
     guillotinaPosicion: HydraulicActuatorPosition.closed,
     hydraulicDischargeActive: false,
+    hydraulicDischargePaused: false,
     hydraulicInitialPeso: 0.0,
     hydraulicTargetPeso: 0.0,
   );
@@ -163,6 +169,7 @@ class SimulatorViewState {
     int? tuboPosicion,
     int? guillotinaPosicion,
     bool? hydraulicDischargeActive,
+    bool? hydraulicDischargePaused,
     double? hydraulicInitialPeso,
     double? hydraulicTargetPeso,
     HydraulicDischargeCommand? lastHydraulicInicio,
@@ -206,6 +213,8 @@ class SimulatorViewState {
       guillotinaPosicion: guillotinaPosicion ?? this.guillotinaPosicion,
       hydraulicDischargeActive:
           hydraulicDischargeActive ?? this.hydraulicDischargeActive,
+      hydraulicDischargePaused:
+          hydraulicDischargePaused ?? this.hydraulicDischargePaused,
       hydraulicInitialPeso: hydraulicInitialPeso ?? this.hydraulicInitialPeso,
       hydraulicTargetPeso: hydraulicTargetPeso ?? this.hydraulicTargetPeso,
       lastHydraulicInicio: lastHydraulicInicio ?? this.lastHydraulicInicio,
