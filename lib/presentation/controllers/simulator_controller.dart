@@ -10,6 +10,7 @@ import 'package:test_jaguar/application/use_cases/set_humidity_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_hydraulic_peso_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_send_protocol_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_st456_screen_use_case.dart';
+import 'package:test_jaguar/application/use_cases/set_toma_fuerza_rpm_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_toma_fuerza_use_case.dart';
 import 'package:test_jaguar/application/use_cases/start_simulation_use_case.dart';
 import 'package:test_jaguar/application/use_cases/stop_simulation_use_case.dart';
@@ -30,6 +31,7 @@ class SimulatorController extends ChangeNotifier {
     required SetSt456ScreenUseCase setSt456ScreenUseCase,
     required SetManualMeasurementUseCase setManualMeasurementUseCase,
     required SetTomaFuerzaUseCase setTomaFuerzaUseCase,
+    required SetTomaFuerzaRpmUseCase setTomaFuerzaRpmUseCase,
     required SetErrorEcuUseCase setErrorEcuUseCase,
     required SendGuardarEventUseCase sendGuardarEventUseCase,
     required SetHydraulicPesoUseCase setHydraulicPesoUseCase,
@@ -41,6 +43,7 @@ class SimulatorController extends ChangeNotifier {
       _setSt456ScreenUseCase = setSt456ScreenUseCase,
         _setManualMeasurementUseCase = setManualMeasurementUseCase,
         _setTomaFuerzaUseCase = setTomaFuerzaUseCase,
+        _setTomaFuerzaRpmUseCase = setTomaFuerzaRpmUseCase,
         _setErrorEcuUseCase = setErrorEcuUseCase,
         _sendGuardarEventUseCase = sendGuardarEventUseCase,
         _setHydraulicPesoUseCase = setHydraulicPesoUseCase {
@@ -55,6 +58,7 @@ class SimulatorController extends ChangeNotifier {
   final SetSt456ScreenUseCase _setSt456ScreenUseCase;
   final SetManualMeasurementUseCase _setManualMeasurementUseCase;
   final SetTomaFuerzaUseCase _setTomaFuerzaUseCase;
+  final SetTomaFuerzaRpmUseCase _setTomaFuerzaRpmUseCase;
   final SetErrorEcuUseCase _setErrorEcuUseCase;
   final SendGuardarEventUseCase _sendGuardarEventUseCase;
   final SetHydraulicPesoUseCase _setHydraulicPesoUseCase;
@@ -83,6 +87,9 @@ class SimulatorController extends ChangeNotifier {
       _setSt456ScreenUseCase(screen);
 
   Future<void> setTomaFuerza(int value) => _setTomaFuerzaUseCase(value);
+
+  Future<void> setTomaFuerzaRpm(int value) =>
+      _setTomaFuerzaRpmUseCase(value);
 
   Future<void> setErrorEcu(String value) => _setErrorEcuUseCase(value);
 
@@ -180,6 +187,7 @@ class SimulatorController extends ChangeNotifier {
         lastJson: status.lastJson,
         logs: status.logs,
         tomaFuerza: status.tomaFuerza,
+        tomaFuerzaRpm: status.tomaFuerzaRpm,
         errorEcu: status.errorEcu,
         tuboPosicion: status.tuboPosicion,
         guillotinaPosicion: status.guillotinaPosicion,

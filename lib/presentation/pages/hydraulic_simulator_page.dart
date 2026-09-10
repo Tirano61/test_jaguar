@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:test_jaguar/domain/value_objects/hydraulic_actuator_position.dart';
 import 'package:test_jaguar/domain/value_objects/hydraulic_discharge_command.dart';
 import 'package:test_jaguar/domain/value_objects/hydraulic_movement_command.dart';
+import 'package:test_jaguar/domain/value_objects/hydraulic_pto.dart';
 import 'package:test_jaguar/presentation/controllers/simulator_controller.dart';
 import 'package:test_jaguar/presentation/state/simulator_view_state.dart';
 import 'package:test_jaguar/presentation/widgets/protocol_status_header.dart';
@@ -108,7 +109,10 @@ class HydraulicSimulatorPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   DropdownButtonFormField<int>(
-                    initialValue: state.tomaFuerza.clamp(0, 3),
+                    initialValue: state.tomaFuerza.clamp(
+                      HydraulicPtoState.off,
+                      HydraulicPtoState.requestOff,
+                    ),
                     isExpanded: true,
                     decoration: const InputDecoration(
                       labelText: 'tomaFuerza',
@@ -118,14 +122,20 @@ class HydraulicSimulatorPage extends StatelessWidget {
                           EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                     ),
                     items: const <DropdownMenuItem<int>>[
-                      DropdownMenuItem<int>(value: 0, child: Text('0 - Apagada')),
-                      DropdownMenuItem<int>(value: 1, child: Text('1 - Encendida')),
                       DropdownMenuItem<int>(
-                        value: 2,
+                        value: HydraulicPtoState.off,
+                        child: Text('0 - Apagada'),
+                      ),
+                      DropdownMenuItem<int>(
+                        value: HydraulicPtoState.on,
+                        child: Text('1 - Encendida'),
+                      ),
+                      DropdownMenuItem<int>(
+                        value: HydraulicPtoState.requestOn,
                         child: Text('2 - Encienda toma de fuerza'),
                       ),
                       DropdownMenuItem<int>(
-                        value: 3,
+                        value: HydraulicPtoState.requestOff,
                         child: Text('3 - Apague toma de fuerza'),
                       ),
                     ],
@@ -134,6 +144,12 @@ class HydraulicSimulatorPage extends StatelessWidget {
                         controller.setTomaFuerza(value);
                       }
                     },
+                  ),
+                  const SizedBox(height: 12),
+                  _PtoRpmField(
+                    value: state.tomaFuerzaRpm,
+                    ptoOn: HydraulicPtoState.isOn(state.tomaFuerza),
+                    onChanged: controller.setTomaFuerzaRpm,
                   ),
                   const SizedBox(height: 12),
                   _ErrorEcuField(
@@ -561,6 +577,54 @@ class _MovimientoSummary extends StatelessWidget {
       return const Text('Sin comando recibido');
     }
     return Text('${value.label} (tipo=${value.tipo})');
+  }
+}
+
+/// Slider de rpm simuladas de la toma de fuerza
+/// (`HydraulicPtoRpm.min` - `HydraulicPtoRpm.max`). El valor se puede
+/// configurar en cualquier estado, pero solo viaja en la key `rpm` del JSON
+/// con la toma de fuerza encendida: en el resto se manda `rpm: 0`.
+class _PtoRpmField extends StatelessWidget {
+  const _PtoRpmField({
+    required this.value,
+    required this.ptoOn,
+    required this.onChanged,
+  });
+
+  final int value;
+  final bool ptoOn;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final int rpm = HydraulicPtoRpm.clamp(value);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          'rpm toma de fuerza: $rpm',
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+        Slider(
+          min: HydraulicPtoRpm.min.toDouble(),
+          max: HydraulicPtoRpm.max.toDouble(),
+          divisions: (HydraulicPtoRpm.max - HydraulicPtoRpm.min) ~/
+              HydraulicPtoRpm.step,
+          value: rpm.toDouble(),
+          label: '$rpm rpm',
+          onChanged: (double next) => onChanged(next.round()),
+        ),
+        Text(
+          ptoOn
+              ? 'Toma de fuerza encendida: el JSON envía rpm: $rpm'
+              : 'Toma de fuerza no encendida: el JSON envía rpm: 0',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ],
+    );
   }
 }
 
