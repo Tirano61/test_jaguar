@@ -1,3 +1,17 @@
+/// Valores del campo `modo` de `AT+INICIO`.
+abstract final class HydraulicDischargeMode {
+  static const int unaDescarga = 1;
+
+  /// Dos descargas: la primera cierra con `AT+GUARDARDOS` en lugar de
+  /// `AT+GUARDAR`, y la app manda un segundo `AT+INICIO` con modo
+  /// [unaDescarga] para el tramo restante.
+  static const int dosDescargas = 2;
+
+  static const int total = 3;
+
+  static const int noria = 4;
+}
+
 /// Comando `AT+INICIO=<kgDescarga>,<kgTubo>,<kgPrecierre>,<modo>,<velocidad>`
 /// recibido por characteristic write en el modo Hidráulico BLE.
 class HydraulicDischargeCommand {
@@ -56,15 +70,21 @@ class HydraulicDischargeCommand {
   /// comando y se valida en el orquestador.
   bool get hasValidRange => kgDescarga > kgTubo;
 
+  /// Modo 2: al completar la descarga la caja manda `AT+GUARDARDOS` en lugar
+  /// de `AT+GUARDAR`, para que la app guarde/imprima/envíe igual pero se quede
+  /// en descarga y pida el segundo tramo con un `AT+INICIO` en modo 1.
+  /// Cualquier otro modo (incluido uno desconocido) cierra con `AT+GUARDAR`.
+  bool get isDosDescargas => modo == HydraulicDischargeMode.dosDescargas;
+
   String get modoLabel {
     switch (modo) {
-      case 1:
+      case HydraulicDischargeMode.unaDescarga:
         return 'Una descarga';
-      case 2:
+      case HydraulicDischargeMode.dosDescargas:
         return 'Dos descargas';
-      case 3:
+      case HydraulicDischargeMode.total:
         return 'Total';
-      case 4:
+      case HydraulicDischargeMode.noria:
         return 'Noria';
       default:
         return 'Desconocido ($modo)';
