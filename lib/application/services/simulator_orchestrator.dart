@@ -41,6 +41,16 @@ class SimulatorOrchestrator {
   static const String _zeroWeightCommand = 'AT+CERO';
   static const String _stopDischargeCommand = 'AT+DETENER';
   static const String _resumeDischargeCommand = 'AT+REANUDAR';
+  static const String _finishDischargeCommand = 'AT+FINALIZAR';
+
+  // Eventos que el simulador NOTIFICA a la app (los de arriba son los que
+  // recibe por characteristic write).
+  static const String _guardarEvent = 'AT+GUARDAR';
+
+  /// Cierre de la primera descarga del modo "dos descargas" (`modo = 2` en
+  /// `AT+INICIO`): la app guarda/imprime/envía igual que con [_guardarEvent],
+  /// pero se queda en descarga y manda un segundo `AT+INICIO` en modo 1.
+  static const String _guardarDosEvent = 'AT+GUARDARDOS';
 
   SendProtocol _sendProtocol = SendProtocol.jaguarBle;
   St456Screen _st456Screen = St456Screen.main;
@@ -85,6 +95,13 @@ class SimulatorOrchestrator {
   // conservan hasta que llegue AT+REANUDAR.
   bool _hydraulicDischargePaused = false;
   bool _hydraulicJustCompleted = false;
+  // Evento de guardado prometido por el AT+INICIO que inició la corrida en
+  // curso: modo 2 ("dos descargas") cierra con AT+GUARDARDOS y el resto con
+  // AT+GUARDAR. Se congela al iniciar la descarga, como el objetivo y la
+  // velocidad, y no se deduce de _lastHydraulicInicio al completar, porque ese
+  // campo también guarda los AT+INICIO inválidos y los que lleguen mientras la
+  // descarga baja.
+  bool _hydraulicSaveAsDosDescargas = false;
   double _hydraulicCurrentDisplayedPeso = 0.0;
   double _hydraulicInitialPeso = 0.0;
   double _hydraulicTargetPeso = 0.0;
@@ -136,6 +153,7 @@ class SimulatorOrchestrator {
     if (_sendProtocol != SendProtocol.hidraulicoBle) {
       _hydraulicDischargeActive = false;
       _hydraulicDischargePaused = false;
+      _hydraulicSaveAsDosDescargas = false;
       _hydraulicCurrentDisplayedPeso = 0.0;
       _hydraulicInitialPeso = 0.0;
       _hydraulicTargetPeso = 0.0;
@@ -207,17 +225,23 @@ class SimulatorOrchestrator {
     await _sendCurrentPayloadNow();
   }
 
-  /// Envía el evento `AT+GUARDAR` crudo por notify BLE. Se dispara solo al
-  /// completar una descarga simulada, y también puede forzarse a mano desde
-  /// la UI en cualquier momento.
-  Future<void> sendGuardarEvent() async {
+  /// Envía el evento `AT+GUARDAR` crudo por notify BLE. Lo usa el botón manual
+  /// de la UI, que siempre manda el cierre clásico; el disparo automático al
+  /// completar una descarga pasa por [_sendSaveEvent], que manda
+  /// `AT+GUARDARDOS` cuando la corrida se inició con modo 2.
+  Future<void> sendGuardarEvent() => _sendSaveEvent(_guardarEvent);
+
+  /// Notifica uno de los eventos de guardado crudos ([_guardarEvent] o
+  /// [_guardarDosEvent]). Centralizado para que el terminador `\r\n` no se
+  /// pueda desincronizar entre los dos.
+  Future<void> _sendSaveEvent(String event) async {
     try {
-      await _bleRepository.notifyUtf8Json('AT+GUARDAR\r\n');
+      await _bleRepository.notifyUtf8Json('$event\r\n');
     } catch (error) {
-      _pushLog('Error enviando AT+GUARDAR: $error');
+      _pushLog('Error enviando $event: $error');
       return;
     }
-    _pushLog('AT+GUARDAR enviado');
+    _pushLog('$event enviado');
   }
 
   Future<void> setSt456Screen(St456Screen screen) async {
@@ -334,11 +358,20 @@ class SimulatorOrchestrator {
 
         if (_hydraulicJustCompleted) {
           _hydraulicJustCompleted = false;
+          // Copia local antes del await: el listener de watchStatus() puede
+          // intercalarse acá y procesar un AT+INICIO nuevo, que pisaría el
+          // evento prometido por la corrida que se está cerrando.
+          final bool dosDescargas = _hydraulicSaveAsDosDescargas;
+          _hydraulicSaveAsDosDescargas = false;
+          final String saveEvent =
+              dosDescargas ? _guardarDosEvent : _guardarEvent;
           _pushLog(
             'Descarga hidráulica completada (peso objetivo alcanzado): '
-            'enviando AT+GUARDAR',
+            'enviando $saveEvent'
+            '${dosDescargas ? ' (modo dos descargas: la app debe mandar un '
+                'segundo AT+INICIO en modo 1)' : ''}',
           );
-          await sendGuardarEvent();
+          await _sendSaveEvent(saveEvent);
         }
       }),
     );
@@ -708,6 +741,18 @@ class SimulatorOrchestrator {
       return;
     }
 
+    if (_isFinishDischargeCommand(normalizedCommand)) {
+      if (_sendProtocol == SendProtocol.hidraulicoBle) {
+        await _applyHydraulicFinalizar();
+      } else {
+        _pushLog(
+          'AT+FINALIZAR recibido pero se ignora: seleccioná "Hidráulico BLE" '
+          'para procesarlo.',
+        );
+      }
+      return;
+    }
+
     final HydraulicDischargeCommand? inicio =
         HydraulicDischargeCommand.tryParse(normalizedCommand);
     if (inicio != null) {
@@ -760,6 +805,7 @@ class SimulatorOrchestrator {
     _hydraulicDecrementPerTick = _hydraulicRateForVelocidad(command.velocidad);
     _hydraulicDischargeActive = true;
     _hydraulicDischargePaused = false;
+    _hydraulicSaveAsDosDescargas = command.isDosDescargas;
 
     // Al descargar el tubo queda totalmente abierto y la guillotina en alguna
     // posición que no sea "cerrada": si venía cerrada se la lleva al primer
@@ -772,7 +818,8 @@ class SimulatorOrchestrator {
     _pushLog(
       'AT+INICIO recibido: ${command.summary} -> tubo '
       '${HydraulicActuatorPosition.label(_tuboPosicion)}, guillotina '
-      '${HydraulicActuatorPosition.label(_guillotinaPosicion)}',
+      '${HydraulicActuatorPosition.label(_guillotinaPosicion)}, cierra con '
+      '${_hydraulicSaveAsDosDescargas ? _guardarDosEvent : _guardarEvent}',
     );
     await _sendCurrentPayloadNow();
   }
@@ -833,6 +880,44 @@ class SimulatorOrchestrator {
       'AT+REANUDAR recibido: descarga retomada desde '
       '${_hydraulicCurrentDisplayedPeso.round()} kg (objetivo '
       '${_hydraulicTargetPeso.round()} kg)',
+    );
+    await _sendCurrentPayloadNow();
+  }
+
+  /// `AT+FINALIZAR` termina la descarga automática sin haber llegado al
+  /// objetivo: el peso queda donde estaba en ese momento y la corrida se
+  /// descarta (no queda nada para reanudar). Sirve tanto con la descarga
+  /// corriendo como pausada por `AT+DETENER`. No se envía `AT+GUARDAR`,
+  /// porque el guardado lo decide la app que finalizó. Los actuadores
+  /// quedan en la posición en la que estaban y vuelven a responder a
+  /// `AT+MOVIMIENTO`.
+  Future<void> _applyHydraulicFinalizar() async {
+    if (!_hydraulicDischargeActive) {
+      _pushLog('AT+FINALIZAR recibido: no hay descarga en curso');
+      await _sendCurrentPayloadNow();
+      return;
+    }
+
+    final bool estabaPausada = _hydraulicDischargePaused;
+    _hydraulicDischargeActive = false;
+    _hydraulicDischargePaused = false;
+    _hydraulicJustCompleted = false;
+    // La corrida se descarta entera: su evento de guardado no puede quedar
+    // pegado para el próximo AT+INICIO.
+    _hydraulicSaveAsDosDescargas = false;
+    // Mientras la descarga corre el peso vive en
+    // _hydraulicCurrentDisplayedPeso: hay que fijarlo en la medición del
+    // modo o el próximo tick volvería al peso previo al AT+INICIO.
+    _hydraulicMeasurement = _hydraulicMeasurement.copyWith(
+      peso: _hydraulicCurrentDisplayedPeso.round(),
+    );
+
+    _pushLog(
+      'AT+FINALIZAR recibido: descarga automática terminada en '
+      '${_hydraulicMeasurement.peso} kg (objetivo '
+      '${_hydraulicTargetPeso.round()} kg'
+      '${estabaPausada ? ', estaba pausada' : ''}), '
+      'no se envía AT+GUARDAR',
     );
     await _sendCurrentPayloadNow();
   }
@@ -919,7 +1004,7 @@ class SimulatorOrchestrator {
 
   // Comandos sin parámetros: se aceptan pelados y también con el `=` del nuevo
   // formato del protocolo hidráulico, por si la app los manda igual que el
-  // resto (AT+DETENER=, AT+REANUDAR=).
+  // resto (AT+DETENER=, AT+REANUDAR=, AT+FINALIZAR=).
   bool _isStopDischargeCommand(String normalizedCommand) =>
       normalizedCommand == _stopDischargeCommand ||
       normalizedCommand == '$_stopDischargeCommand=';
@@ -927,6 +1012,10 @@ class SimulatorOrchestrator {
   bool _isResumeDischargeCommand(String normalizedCommand) =>
       normalizedCommand == _resumeDischargeCommand ||
       normalizedCommand == '$_resumeDischargeCommand=';
+
+  bool _isFinishDischargeCommand(String normalizedCommand) =>
+      normalizedCommand == _finishDischargeCommand ||
+      normalizedCommand == '$_finishDischargeCommand=';
 
   List<String> _logsForBleStatusChange({
     required BlePeripheralStatus previous,

@@ -19,6 +19,9 @@ Incorporar un nuevo modo de descarga para BLE en el que la balanza controla hidr
 - Permite iniciar descarga por comando AT+INICIO desde diálogo de operación.
 - Permite mover manualmente tubo y guillotina por AT+MOVIMIENTO desde pantalla.
 - Recibe eventos de guardado por AT+GUARDAR desde notify BLE.
+- Recibe AT+GUARDARDOS como cierre de la primera descarga del modo dos
+  descargas: guarda igual que con AT+GUARDAR pero se queda en descarga y pide
+  el segundo tramo.
 - Muestra en pantalla estados de toma de fuerza y mensaje de error ECU.
 - Ignora sensorInduc para transición de pantallas y guardado cuando el modo está activo.
 
@@ -46,6 +49,17 @@ Validaciones:
 - kgDescarga > kgTubo
 - kgDescarga < peso actual en tolva
 
+Sobre el modo:
+
+- modo = 2 (dos descargas) cambia unicamente el evento con el que cierra esa
+  corrida: en lugar de AT+GUARDAR se envia AT+GUARDARDOS (ver 4.8). El resto de
+  la descarga (validaciones, AT+DETENER / AT+REANUDAR / AT+FINALIZAR, posiciones
+  de tubo y guillotina, velocidad) es identico a cualquier otra descarga.
+- El segundo AT+INICIO de esa secuencia va con modo = 1 y su kgDescarga se
+  valida contra el peso remanente, o sea el que quedo despues de la primera
+  descarga.
+- Los modos 1, 3, 4 y cualquier valor desconocido cierran con AT+GUARDAR.
+
 ### 4.3 Comando de pausa de descarga
 
 AT+DETENER\r\n
@@ -66,12 +80,34 @@ AT+REANUDAR\r\n
 - Al alcanzar el objetivo dispara AT+GUARDAR como cualquier descarga completa.
 - Si no hay descarga pausada, se ignora.
 
-### 4.5 Evento de guardado
+### 4.5 Comando de finalización de descarga
+
+AT+FINALIZAR\r\n
+
+- Termina la descarga automática en curso sin haber llegado al objetivo.
+- El peso queda donde estaba en ese momento.
+- Descarta la corrida: no queda nada para reanudar con AT+REANUDAR.
+- Vale con la descarga corriendo y también con la descarga pausada por AT+DETENER.
+- No dispara AT+GUARDAR: el guardado lo decide la app que finalizó.
+- Tubo y guillotina quedan en su posición y vuelven a aceptar AT+MOVIMIENTO.
+- Si no hay descarga en curso, se ignora.
+
+### 4.6 Evento de guardado
 
 - Entrada por notify BLE: AT+GUARDAR
+- Se emite al completar una descarga iniciada con modo distinto de 2, y tambien
+  desde el boton manual del simulador.
 - Compatibilidad recomendada de parser: AT+GUARDAR, AT+GUARDAR() y variantes con espacios.
+- Atencion: AT+GUARDAR es prefijo de AT+GUARDARDOS (4.8). El parser tiene que
+  comparar la linea completa por igualdad exacta, o evaluar AT+GUARDARDOS antes
+  que AT+GUARDAR y cortar ahi. Con contains / startsWith sobre AT+GUARDAR, una
+  descarga en modo 2 se procesa como guardado simple, la app vuelve a la
+  pantalla de carga y la segunda descarga nunca se pide.
+- Por el mismo motivo, evaluar recien al cerrar la linea en \r\n y nunca sobre
+  el buffer parcial: el notify va troceado por MTU y AT+GUARDARDOS podria
+  verse como AT+GUARDAR antes de recibir el resto.
 
-### 4.6 Movimiento manual
+### 4.7 Movimiento manual
 
 AT+MOVIMIENTO=<tipo>\r\n
 
@@ -79,6 +115,50 @@ AT+MOVIMIENTO=<tipo>\r\n
 - 2 cerrar tubo
 - 3 abrir guillotina
 - 4 cerrar guillotina
+
+### 4.8 Evento de guardado con segunda descarga
+
+AT+GUARDARDOS\r\n
+
+- Se emite en lugar de AT+GUARDAR cuando la descarga que se acaba de completar
+  fue iniciada con AT+INICIO en modo = 2 (dos descargas).
+- Se emite unicamente al alcanzar el peso objetivo. AT+DETENER no lo emite (solo
+  pausa) y AT+FINALIZAR tampoco (descarta la corrida sin mandar ningun guardado).
+- Una descarga en modo 2 pausada con AT+DETENER y retomada con AT+REANUDAR sigue
+  cerrando con AT+GUARDARDOS.
+- Despues de emitirlo la balanza no queda en ningun estado especial: la corrida
+  termino, tubo y guillotina conservan su posicion y vuelven a aceptar
+  AT+MOVIMIENTO. Queda esperando un AT+INICIO nuevo como en cualquier otro momento.
+
+Comportamiento esperado de la app al recibirlo:
+
+- Ejecuta el mismo guardado que con AT+GUARDAR: persiste la pesada, imprime y
+  envia, con la misma logica de parcial.
+- No navega a la pantalla de carga: se queda en la pantalla de descarga.
+- Abre el dialogo de inicio de descarga con el modo fijo en 1 (una sola
+  descarga), no editable. Los demas parametros (kg a descargar, velocidad, etc.)
+  quedan editables, igual que en la pantalla de carga.
+- Al confirmar envia AT+INICIO=<kgDescarga>,<kgTubo>,<kgPrecierre>,1,<velocidad>.
+  Esa segunda corrida cierra con AT+GUARDAR (4.6) y recien ahi la app vuelve a
+  la pantalla de carga.
+
+Secuencia completa:
+
+```
+app -> AT+INICIO=1500,300,100,2,2
+bal <- {json...}            (peso bajando)
+bal <- AT+GUARDARDOS        la app guarda/imprime/envia y se queda en descarga
+app -> AT+INICIO=800,300,100,1,2   modo fijo en 1
+bal <- {json...}            (peso bajando)
+bal <- AT+GUARDAR           la app guarda y vuelve a carga
+```
+
+- Si la app manda el segundo AT+INICIO otra vez con modo = 2, la balanza vuelve
+  a responder AT+GUARDARDOS: no hay tope ni corte del lado de la balanza, el
+  modo lo fija la app. Por eso el dialogo del segundo tramo tiene el modo
+  bloqueado en 1.
+- Si llega AT+FINALIZAR entre las dos descargas (despues de AT+GUARDARDOS y
+  antes del segundo AT+INICIO) se ignora: no hay descarga en curso.
 
 ## 5. Estrategia de UI
 
@@ -268,6 +348,9 @@ Entregable:
 - El modo hidráulico puede activarse/desactivarse por configuración BLE.
 - AT+INICIO se envía con formato y orden acordado.
 - AT+GUARDAR dispara guardado correcto con lógica de parcial actual.
+- Una descarga iniciada en modo 2 cierra con AT+GUARDARDOS y la segunda, en
+  modo 1, con AT+GUARDAR.
+- El parser distingue AT+GUARDARDOS de AT+GUARDAR sin ambigüedad de prefijo.
 - Los 4 comandos AT+MOVIMIENTO funcionan desde carga y descarga hidráulica.
 - Toma de fuerza y errorEcu se muestran de forma persistente y clara.
 - Documentación técnica del nuevo protocolo queda incluida.
