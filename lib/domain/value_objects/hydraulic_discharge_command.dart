@@ -66,8 +66,9 @@ class HydraulicDischargeCommand {
 
   /// Regla de negocio documentada por el protocolo: la descarga sólo es
   /// consistente si kgDescarga es mayor que kgTubo. La otra regla (kgDescarga
-  /// < peso actual en tolva) depende del estado en el momento de recibir el
-  /// comando y se valida en el orquestador.
+  /// <= peso actual en tolva, con el igual reservado a la descarga total)
+  /// depende del estado en el momento de recibir el comando y se valida en el
+  /// orquestador.
   bool get hasValidRange => kgDescarga > kgTubo;
 
   /// Modo 2: al completar la descarga la caja manda `AT+GUARDARDOS` en lugar

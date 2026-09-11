@@ -47,7 +47,10 @@ Mapeos:
 Validaciones:
 
 - kgDescarga > kgTubo
-- kgDescarga < peso actual en tolva
+- kgDescarga <= peso actual en tolva. El igual es la descarga total: el
+  firmware recibe todo el contenido de la tolva y la vacia, asi que un
+  kgDescarga igual al peso es valido. Lo unico que se rechaza es pedir mas
+  kg de los que hay cargados.
 
 Sobre el modo:
 
