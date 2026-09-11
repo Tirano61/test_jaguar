@@ -377,10 +377,31 @@ class SimulatorOrchestrator {
     );
   }
 
+  /// Medición vigente del modo Hidráulico BLE. Mientras una descarga corre el
+  /// peso vive en [_hydraulicCurrentDisplayedPeso] y no en
+  /// [_hydraulicMeasurement], que sólo se fija al pausar, finalizar o
+  /// completar la corrida.
+  ScaleMeasurement get _currentHydraulicMeasurement {
+    final ScaleMeasurement base =
+        _hydraulicMeasurement.copyWith(humedad: _selectedHumidity);
+    return _hydraulicDischargeActive
+        ? base.copyWith(peso: _hydraulicCurrentDisplayedPeso.round())
+        : base;
+  }
+
   Future<void> _sendCurrentPayloadNow() async {
-    final ScaleMeasurement measurement = _sendProtocol == SendProtocol.manual
-        ? _manualMeasurement
-        : _current.measurement.copyWith(humedad: _selectedHumidity);
+    // El peso del modo hidráulico no pasa por el motor de simulación: leer
+    // _current.measurement acá lo dejaba desactualizado hasta el próximo tick
+    // (y con la simulación detenida, para siempre), así que cada envío fuera
+    // del tick mandaba el peso viejo.
+    final ScaleMeasurement measurement;
+    if (_sendProtocol == SendProtocol.manual) {
+      measurement = _manualMeasurement;
+    } else if (_sendProtocol == SendProtocol.hidraulicoBle) {
+      measurement = _currentHydraulicMeasurement;
+    } else {
+      measurement = _current.measurement.copyWith(humedad: _selectedHumidity);
+    }
     await _notifyAndEmitMeasurement(
       measurement,
       weightHoldSecondsRemaining:
@@ -514,16 +535,10 @@ class SimulatorOrchestrator {
     // sensorInduc nunca cambia (la app conectada maneja la transición
     // carga/descarga por comando, no por sensor).
     if (_sendProtocol == SendProtocol.hidraulicoBle) {
-      if (_hydraulicDischargeActive) {
-        // Descarga pausada por AT+DETENER: el peso queda donde estaba y la
-        // corrida sigue viva hasta que llegue AT+REANUDAR.
-        if (_hydraulicDischargePaused) {
-          return _hydraulicMeasurement.copyWith(
-            peso: _hydraulicCurrentDisplayedPeso.round(),
-            humedad: _selectedHumidity,
-          );
-        }
-
+      // Sólo una descarga en curso y no pausada por AT+DETENER baja el peso
+      // en este tick: pausada, queda donde estaba y la corrida sigue viva
+      // hasta que llegue AT+REANUDAR.
+      if (_hydraulicDischargeActive && !_hydraulicDischargePaused) {
         final double next =
             _hydraulicCurrentDisplayedPeso - _hydraulicDecrementPerTick;
         if (next <= _hydraulicTargetPeso) {
@@ -536,12 +551,8 @@ class SimulatorOrchestrator {
         } else {
           _hydraulicCurrentDisplayedPeso = next;
         }
-        return _hydraulicMeasurement.copyWith(
-          peso: _hydraulicCurrentDisplayedPeso.round(),
-          humedad: _selectedHumidity,
-        );
       }
-      return _hydraulicMeasurement.copyWith(humedad: _selectedHumidity);
+      return _currentHydraulicMeasurement;
     }
 
     ScaleMeasurement base = measurement.copyWith(humedad: _selectedHumidity);
@@ -785,14 +796,17 @@ class SimulatorOrchestrator {
   Future<void> _applyHydraulicInicio(HydraulicDischargeCommand command) async {
     _lastHydraulicInicio = command;
 
-    final int currentPeso = _current.measurement.peso;
+    final int currentPeso = _currentHydraulicMeasurement.peso;
     final bool validRange = command.hasValidRange;
-    final bool validAgainstCurrent = command.kgDescarga < currentPeso;
+    // Igual al peso de la tolva es válido: así es como el firmware recibe una
+    // descarga total (se le manda todo el contenido y la vacía). Lo único que
+    // no se puede pedir es descargar más de lo que hay.
+    final bool validAgainstCurrent = command.kgDescarga <= currentPeso;
 
     if (!validRange || !validAgainstCurrent) {
       _pushLog(
         'AT+INICIO recibido con parámetros inválidos (${command.summary}): '
-        'se requiere kgDescarga > kgTubo y kgDescarga < peso actual '
+        'se requiere kgDescarga > kgTubo y kgDescarga <= peso actual '
         '($currentPeso kg). No se inicia la descarga simulada.',
       );
       await _sendCurrentPayloadNow();
