@@ -24,8 +24,6 @@ class BlePeripheralRepositoryImpl implements BlePeripheralRepository {
   Future<void> dispose() => _dataSource.dispose();
 
   @override
-  Future<void> updateBleUuids(BleUuids uuids) {
-    // TODO: implement updateBleUuids
-    return _dataSource.updateBleUuids(uuids);
-  }
+  Future<void> updateBleUuids(BleUuids uuids) =>
+      _dataSource.updateBleUuids(uuids);
 }
