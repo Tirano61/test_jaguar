@@ -8,15 +8,17 @@ import 'package:test_jaguar/presentation/state/simulator_view_state.dart';
 import 'package:test_jaguar/presentation/widgets/protocol_status_header.dart';
 import 'package:test_jaguar/presentation/widgets/section_card.dart';
 
-/// Pantalla dedicada al modo "Hidráulico BLE". A diferencia de los otros
-/// protocolos (que sólo agregan una card dentro de la pantalla clásica),
-/// acá el comportamiento a probar es distinto: hay que representar el
-/// estado del tubo y la guillotina al recibir AT+MOVIMIENTO, además de
-/// AT+INICIO y AT+GUARDAR. `SimulatorPage` actúa como router y muestra esta
-/// pantalla completa cuando `sendProtocol == hidraulicoBle` (mismo patrón
-/// que un `WorkShellPage` que rutea por estado).
-class HydraulicSimulatorPage extends StatelessWidget {
-  const HydraulicSimulatorPage({required this.controller, super.key});
+/// Pantalla del modo "Hidráulico BLE".
+///
+/// Es la única que no usa `SimulatorScaffold`: los otros tres protocolos
+/// muestran una balanza y sólo cambian los controles, pero acá lo que hay que
+/// ver es otra cosa — el estado del tubo y la guillotina, y el avance de la
+/// descarga. Compartir el scaffold obligaría a llenarlo de huecos opcionales.
+///
+/// Igual comparte `ProtocolStatusHeader`, que es la forma de volver a los otros
+/// modos: no hay navegación con botón atrás.
+class HydraulicView extends StatelessWidget {
+  const HydraulicView({required this.controller, super.key});
 
   final SimulatorController controller;
 
