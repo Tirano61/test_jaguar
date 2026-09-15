@@ -1,3 +1,4 @@
+import 'package:test_jaguar/core/constants/ble_constants.dart';
 import 'package:test_jaguar/domain/entities/ble_peripheral_status.dart';
 import 'package:test_jaguar/domain/entities/scale_measurement.dart';
 import 'package:test_jaguar/domain/value_objects/hydraulic_actuator_position.dart';
@@ -13,6 +14,7 @@ class SimulatorStatusDto {
     required this.bleStatus,
     required this.running,
     required this.sendProtocol,
+    required this.bleUuids,
     required this.st407Screen,
     required this.phase,
     required this.measurement,
@@ -36,6 +38,10 @@ class SimulatorStatusDto {
   final BlePeripheralStatus bleStatus;
   final bool running;
   final SendProtocol sendProtocol;
+
+  /// Perfil GATT que el protocolo activo pide anunciar. Lo decide el
+  /// protocolo, así que la UI lo muestra en vez de volver a deducirlo.
+  final BleUuids bleUuids;
   final St407Screen st407Screen;
   final SimulationPhase phase;
   final ScaleMeasurement measurement;
@@ -69,6 +75,7 @@ class SimulatorStatusDto {
     bleStatus: BlePeripheralStatus.initial,
     running: false,
     sendProtocol: SendProtocol.jaguarBle,
+    bleUuids: BleConstants.jaguar,
     st407Screen: St407Screen.main,
     phase: SimulationPhase.loadedWaiting,
     measurement: ScaleMeasurement.baseline,
@@ -91,6 +98,7 @@ class SimulatorStatusDto {
     BlePeripheralStatus? bleStatus,
     bool? running,
     SendProtocol? sendProtocol,
+    BleUuids? bleUuids,
     St407Screen? st407Screen,
     SimulationPhase? phase,
     ScaleMeasurement? measurement,
@@ -114,6 +122,7 @@ class SimulatorStatusDto {
       bleStatus: bleStatus ?? this.bleStatus,
       running: running ?? this.running,
       sendProtocol: sendProtocol ?? this.sendProtocol,
+      bleUuids: bleUuids ?? this.bleUuids,
       st407Screen: st407Screen ?? this.st407Screen,
       phase: phase ?? this.phase,
       measurement: measurement ?? this.measurement,

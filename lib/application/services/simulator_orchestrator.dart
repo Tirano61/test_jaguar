@@ -4,7 +4,6 @@ import 'package:test_jaguar/application/dto/hydraulic_payload_dto.dart';
 import 'package:test_jaguar/application/dto/scale_payload_dto.dart';
 import 'package:test_jaguar/application/dto/st407_payload_dto.dart';
 import 'package:test_jaguar/application/dto/simulator_status_dto.dart';
-import 'package:test_jaguar/core/constants/ble_constants.dart';
 import 'package:test_jaguar/core/extensions/stream_subscription_extensions.dart';
 import 'package:test_jaguar/domain/entities/ble_peripheral_status.dart';
 import 'package:test_jaguar/domain/entities/scale_measurement.dart';
@@ -16,6 +15,8 @@ import 'package:test_jaguar/domain/value_objects/hydraulic_movement_command.dart
 import 'package:test_jaguar/domain/value_objects/hydraulic_pto.dart';
 import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
 import 'package:test_jaguar/domain/value_objects/st407_screen.dart';
+import 'package:test_jaguar/protocols/protocol_registry.dart';
+import 'package:test_jaguar/protocols/simulator_protocol.dart';
 
 class SimulatorOrchestrator {
   SimulatorOrchestrator({
@@ -28,6 +29,11 @@ class SimulatorOrchestrator {
 
   final BlePeripheralRepository _bleRepository;
   final ScaleSimulationRepository _simulationRepository;
+  final ProtocolRegistry _registry = ProtocolRegistry.standard();
+
+  /// Implementación del protocolo seleccionado. Es la que sabe qué perfil GATT
+  /// anunciar y cómo enmarcar el payload, en vez de que lo decida un `if` acá.
+  SimulatorProtocol get _protocol => _registry.of(_sendProtocol);
 
   final StreamController<SimulatorStatusDto> _statusController =
       StreamController<SimulatorStatusDto>.broadcast();
@@ -63,7 +69,7 @@ class SimulatorOrchestrator {
   bool _st407LoadingActive = false;
   // decremento por tick aplicado al peso actual mostrado
   final double _st407DecrementPerTick = 1.0;
-  // Estado de cuenta regresiva para pantalla 65 (mezclando): inicia en 4:30
+  // Estado de cuenta regresiva para pantalla 105 (mezclando): inicia en 4:30
   bool _st407MixingCountdownActive = false;
   int _st407MixingCurrentSeconds = 4 * 60 + 30;
   int _lastSensorInduc = SimulatorStatusDto.initial.measurement.sensorInduc;
@@ -129,11 +135,7 @@ class SimulatorOrchestrator {
       return;
     }
     _sendProtocol = protocol;
-    await _bleRepository.updateBleUuids(
-      protocol == SendProtocol.st407Remote
-          ? BleConstants.remotoAbf3
-          : BleConstants.jaguar,
-    );
+    await _bleRepository.updateBleUuids(_protocol.bleUuids);
     _weightHoldTicksRemaining = 0;
     _heldWeight = null;
     _lastSensorInduc = _current.measurement.sensorInduc;
@@ -162,7 +164,10 @@ class SimulatorOrchestrator {
       _guillotinaPosicion = HydraulicActuatorPosition.closed;
     }
 
-    _emit(_withHydraulicSnapshot(_current.copyWith(sendProtocol: _sendProtocol)));
+    _emit(_withHydraulicSnapshot(_current.copyWith(
+      sendProtocol: _sendProtocol,
+      bleUuids: _protocol.bleUuids,
+    )));
     _pushLog('Protocolo seleccionado: ${protocol.label}');
     await _sendCurrentPayloadNow();
   }
@@ -425,6 +430,7 @@ class SimulatorOrchestrator {
         _current.copyWith(
           measurement: measurement,
           sendProtocol: _sendProtocol,
+          bleUuids: _protocol.bleUuids,
           st407Screen: _st407Screen,
           manualMeasurement: _manualMeasurement,
           weightHoldSecondsRemaining: weightHoldSecondsRemaining,
