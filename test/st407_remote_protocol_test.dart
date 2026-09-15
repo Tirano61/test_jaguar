@@ -28,7 +28,7 @@ void main() {
       // Ya viene emitida por el cambio de protocolo.
       expect(
         harness.lastPayload,
-        matches(RegExp(r'^60,1000,0,0,1,,,\d{2}-\d{2}-\d{2} \d{2}:\d{2}\r\n$')),
+        matches(RegExp(r'^100,1000,0,0,1,,,\d{2}-\d{2}-\d{2} \d{2}:\d{2}\r\n$')),
       );
     });
 
@@ -37,48 +37,48 @@ void main() {
 
       expect(
         await _payloadDePantalla(harness, St407Screen.unloadingGuide),
-        '63,1000,0,150,M1\r\n',
+        '103,1000,0,150,M1\r\n',
       );
       expect(
         await _payloadDePantalla(harness, St407Screen.unloadingManual),
-        '64,1000,20,250,7\r\n',
+        '104,1000,20,250,7\r\n',
       );
       expect(
         await _payloadDePantalla(harness, St407Screen.chooseRecipe),
-        '66,1,0,1200\r\n',
+        '106,1,0,1200\r\n',
       );
       expect(
         await _payloadDePantalla(harness, St407Screen.chooseAutonomous),
-        '67,1,ADGF,15/05/2017,17/05/2017,Receta1,Guia1\r\n',
+        '107,1,ADGF,15/05/2017,17/05/2017,Receta1,Guia1\r\n',
       );
       expect(
         await _payloadDePantalla(harness, St407Screen.chooseGuide),
-        '68,1,DescNov\r\n',
+        '108,1,DescNov\r\n',
       );
       expect(
         await _payloadDePantalla(harness, St407Screen.main),
-        matches(RegExp(r'^60,1000,')),
+        matches(RegExp(r'^100,1000,')),
       );
     });
 
     test('las 3 pantallas con animación no pasan por el DTO', () async {
       final Harness harness = await _st407Harness();
 
-      // El DTO diría '61,1000,20,117,Maiz'; el simulador arma la cadena a mano
+      // El DTO diría '101,1000,20,117,Maiz'; el simulador arma la cadena a mano
       // para poder mover "peso actual" y "parcial" tick a tick.
       expect(
         await _payloadDePantalla(harness, St407Screen.loadingRecipe),
-        '61,1000,0,1000,Maiz\r\n',
+        '101,1000,0,1000,Maiz\r\n',
       );
-      // El DTO diría '62,1000,20,1200,1'.
+      // El DTO diría '102,1000,20,1200,1'.
       expect(
         await _payloadDePantalla(harness, St407Screen.loadingManual),
-        '62,1000,0,1000,1\r\n',
+        '102,1000,0,1000,1\r\n',
       );
-      // El DTO diría '65,1,23'.
+      // El DTO diría '105,1,23'.
       expect(
         await _payloadDePantalla(harness, St407Screen.mixing),
-        '65,4,30\r\n',
+        '105,4,30\r\n',
       );
     });
   });
@@ -91,10 +91,10 @@ void main() {
 
       // El peso que trae el motor es irrelevante en estas pantallas.
       await harness.tickWith(peso: 5000);
-      expect(harness.lastPayload, '61,999,1,1000,Maiz\r\n');
+      expect(harness.lastPayload, '101,999,1,1000,Maiz\r\n');
 
       await harness.tickWith(peso: 5000);
-      expect(harness.lastPayload, '61,998,2,1000,Maiz\r\n');
+      expect(harness.lastPayload, '101,998,2,1000,Maiz\r\n');
     });
 
     test('volver a la pantalla de carga vuelve a tomar el peso actual',
@@ -103,13 +103,13 @@ void main() {
       await _payloadDePantalla(harness, St407Screen.loadingRecipe);
       await harness.tickWith(peso: 5000);
       await harness.tickWith(peso: 5000);
-      expect(harness.lastPayload, '61,998,2,1000,Maiz\r\n');
+      expect(harness.lastPayload, '101,998,2,1000,Maiz\r\n');
 
       // Salir y volver reinicia "kg a cargar" con el peso vigente.
       await _payloadDePantalla(harness, St407Screen.main);
       expect(
         await _payloadDePantalla(harness, St407Screen.loadingRecipe),
-        '61,998,0,998,Maiz\r\n',
+        '101,998,0,998,Maiz\r\n',
       );
     });
   });
@@ -119,21 +119,21 @@ void main() {
       final Harness harness = await _st407Harness();
       expect(
         await _payloadDePantalla(harness, St407Screen.mixing),
-        '65,4,30\r\n',
+        '105,4,30\r\n',
       );
 
       await harness.tickWith(peso: 1000);
-      expect(harness.lastPayload, '65,4,29\r\n');
+      expect(harness.lastPayload, '105,4,29\r\n');
       await harness.tickWith(peso: 1000);
-      expect(harness.lastPayload, '65,4,28\r\n');
+      expect(harness.lastPayload, '105,4,28\r\n');
 
       // Los segundos van con cero a la izquierda, los minutos no.
       for (int i = 0; i < 300; i++) {
         await harness.tickWith(peso: 1000);
       }
-      expect(harness.lastPayload, '65,0,00\r\n');
+      expect(harness.lastPayload, '105,0,00\r\n');
       await harness.tickWith(peso: 1000);
-      expect(harness.lastPayload, '65,0,00\r\n');
+      expect(harness.lastPayload, '105,0,00\r\n');
     });
 
     test('AT+CERO le roba un segundo a la cuenta regresiva', () async {
@@ -142,12 +142,12 @@ void main() {
 
       // AT+CERO fuera del modo manual emite una medición efímera en cero, y
       // ese envío pasa por el mismo formateador que decrementa el reloj. Sin
-      // el comando, el próximo tick daría 65,4,29.
+      // el comando, el próximo tick daría 105,4,29.
       await harness.receive('AT+CERO\r\n');
-      expect(harness.lastPayload, '65,4,29\r\n');
+      expect(harness.lastPayload, '105,4,29\r\n');
 
       await harness.tickWith(peso: 1000);
-      expect(harness.lastPayload, '65,4,28\r\n');
+      expect(harness.lastPayload, '105,4,28\r\n');
     });
   });
 
@@ -169,7 +169,7 @@ void main() {
     final Harness harness = await _st407Harness();
     await _payloadDePantalla(harness, St407Screen.loadingRecipe);
     await harness.tickWith(peso: 5000);
-    expect(harness.lastPayload, '61,999,1,1000,Maiz\r\n');
+    expect(harness.lastPayload, '101,999,1,1000,Maiz\r\n');
 
     await harness.orchestrator.setSendProtocol(SendProtocol.jaguarBle);
     await harness.orchestrator.setSendProtocol(SendProtocol.st407Remote);
@@ -180,9 +180,9 @@ void main() {
     // en el envío inmediato del cambio de protocolo, no en el próximo tick.
     // Ese re-sembrado lo hace el bloque de init duplicado que vive dentro del
     // formateador de payload.
-    expect(harness.lastPayload, '61,999,0,999,Maiz\r\n');
+    expect(harness.lastPayload, '101,999,0,999,Maiz\r\n');
 
     await harness.tickWith(peso: 5000);
-    expect(harness.lastPayload, '61,998,1,999,Maiz\r\n');
+    expect(harness.lastPayload, '101,998,1,999,Maiz\r\n');
   });
 }

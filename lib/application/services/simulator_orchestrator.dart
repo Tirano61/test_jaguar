@@ -494,8 +494,8 @@ class SimulatorOrchestrator {
         }
       }
 
-      // Pantalla 65 - mezclando: formato pantalla,minutos,segundos
-      // Debe iniciar en 65,4,30 y decrementar como reloj.
+      // Pantalla 105 - mezclando: formato pantalla,minutos,segundos
+      // Debe iniciar en 105,4,30 y decrementar como reloj.
       if (_st407Screen == St407Screen.mixing) {
         if (!_st407MixingCountdownActive) {
           _st407MixingCountdownActive = true;
