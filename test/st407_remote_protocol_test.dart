@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:test_jaguar/core/constants/payload_framing.dart';
 import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
 import 'package:test_jaguar/protocols/st407_remote/st407_screen.dart';
 
@@ -151,18 +152,22 @@ void main() {
     });
   });
 
-  test('cambiar de protocolo pide el perfil GATT correcto', () async {
+  test('cambiar de protocolo pide el perfil GATT y el framing correctos',
+      () async {
     final Harness harness = await _st407Harness();
 
     expect(harness.ble.uuidUpdates, hasLength(1));
-    expect(harness.ble.uuidUpdates.single.serviceUuid,
+    expect(harness.ble.uuidUpdates.single.uuids.serviceUuid,
         '0000ABF3-0000-1000-8000-00805F9B34FB');
+    expect(harness.ble.uuidUpdates.single.framing,
+        PayloadFraming.fiveByteHeader);
 
     await harness.orchestrator.setSendProtocol(SendProtocol.jaguarBle);
     await pumpEventQueue();
     expect(harness.ble.uuidUpdates, hasLength(2));
-    expect(harness.ble.uuidUpdates.last.serviceUuid,
+    expect(harness.ble.uuidUpdates.last.uuids.serviceUuid,
         '0000ABF0-0000-1000-8000-00805F9B34FB');
+    expect(harness.ble.uuidUpdates.last.framing, PayloadFraming.plain);
   });
 
   test('salir del protocolo limpia los contadores de carga', () async {

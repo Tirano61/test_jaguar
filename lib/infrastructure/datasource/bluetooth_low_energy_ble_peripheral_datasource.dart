@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:bluetooth_low_energy/bluetooth_low_energy.dart';
 import 'package:test_jaguar/core/constants/ble_constants.dart';
+import 'package:test_jaguar/core/constants/payload_framing.dart';
 import 'package:test_jaguar/domain/entities/ble_peripheral_status.dart';
 import 'package:test_jaguar/infrastructure/datasource/ble_peripheral_datasource.dart';
 
@@ -50,6 +51,7 @@ class BluetoothLowEnergyBlePeripheralDataSource
   String _lastPayload = '{}';
   String _lastReceivedCommand = '';
   BleUuids _activeUuids = BleConstants.jaguar;
+  PayloadFraming _activeFraming = PayloadFraming.plain;
   int _packetId = 0;
   int _commandSequence = 0;
 
@@ -138,9 +140,16 @@ class BluetoothLowEnergyBlePeripheralDataSource
   }
 
   @override
-  Future<void> updateBleUuids(BleUuids uuids) async {
+  Future<void> updateBleProfile({
+    required BleUuids uuids,
+    required PayloadFraming framing,
+  }) async {
+    // El framing se guarda siempre: dos protocolos pueden compartir perfil GATT
+    // y enmarcar distinto, y en ese caso no hay que rearmar el advertising.
+    _activeFraming = framing;
+
     final bool didChange = _activeUuids.serviceUuid != uuids.serviceUuid ||
-      _activeUuids.writeServiceUuid != uuids.writeServiceUuid ||
+        _activeUuids.writeServiceUuid != uuids.writeServiceUuid ||
         _activeUuids.notifyUuid != uuids.notifyUuid ||
         _activeUuids.writeUuid != uuids.writeUuid;
     if (!didChange) {
@@ -168,8 +177,9 @@ class BluetoothLowEnergyBlePeripheralDataSource
       return;
     }
 
-    // Perfil remoto ABF3: framing binario con cabecera de 5 bytes.
-    if (_activeUuids.serviceUuid.toUpperCase() == BleConstants.remotoAbf3.serviceUuid.toUpperCase()) {
+    // El protocolo activo declara como enmarcar; el transporte ya no lo deduce
+    // comparando UUIDs.
+    if (_activeFraming == PayloadFraming.fiveByteHeader) {
       // Ensure termination CRLF and send framed ASCII payloads per-central.
       String full = utf8JsonPayload;
       if (!full.endsWith('\r\n')) {

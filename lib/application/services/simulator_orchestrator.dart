@@ -96,7 +96,10 @@ class SimulatorOrchestrator {
       return;
     }
     _sendProtocol = protocol;
-    await _bleRepository.updateBleUuids(_protocol.bleUuids);
+    await _bleRepository.updateBleProfile(
+      uuids: _protocol.bleUuids,
+      framing: _protocol.framing,
+    );
     _automatisms.reset(sensorInduc: _current.measurement.sensorInduc);
 
     // Limpiar estado ST407 si ya no estamos en ese protocolo

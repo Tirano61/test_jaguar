@@ -1,4 +1,5 @@
 import 'package:test_jaguar/core/constants/ble_constants.dart';
+import 'package:test_jaguar/core/constants/payload_framing.dart';
 import 'package:test_jaguar/domain/entities/ble_peripheral_status.dart';
 import 'package:test_jaguar/domain/repositories/ble_peripheral_repository.dart';
 import 'package:test_jaguar/infrastructure/datasource/ble_peripheral_datasource.dart';
@@ -24,6 +25,9 @@ class BlePeripheralRepositoryImpl implements BlePeripheralRepository {
   Future<void> dispose() => _dataSource.dispose();
 
   @override
-  Future<void> updateBleUuids(BleUuids uuids) =>
-      _dataSource.updateBleUuids(uuids);
+  Future<void> updateBleProfile({
+    required BleUuids uuids,
+    required PayloadFraming framing,
+  }) =>
+      _dataSource.updateBleProfile(uuids: uuids, framing: framing);
 }

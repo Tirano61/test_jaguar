@@ -1,7 +1,7 @@
 import 'package:test_jaguar/core/constants/ble_constants.dart';
 import 'package:test_jaguar/domain/entities/scale_measurement.dart';
 import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
-import 'package:test_jaguar/protocols/payload_framing.dart';
+import 'package:test_jaguar/core/constants/payload_framing.dart';
 
 /// Lo que cada protocolo del simulador sabe de sí mismo.
 ///

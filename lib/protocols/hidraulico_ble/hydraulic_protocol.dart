@@ -7,7 +7,7 @@ import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_movement_command.
 import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_payload.dart';
 import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_pto.dart';
 import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_state.dart';
-import 'package:test_jaguar/protocols/payload_framing.dart';
+import 'package:test_jaguar/core/constants/payload_framing.dart';
 import 'package:test_jaguar/protocols/simulator_protocol.dart';
 
 /// Eventos que el simulador **notifica** a la app al cerrar una descarga.
