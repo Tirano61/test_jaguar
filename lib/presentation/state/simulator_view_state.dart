@@ -1,10 +1,14 @@
-import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_actuator_position.dart';
-import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_discharge_command.dart';
-import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_movement_command.dart';
-import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_pto.dart';
+import 'package:test_jaguar/domain/entities/scale_measurement.dart';
 import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
+import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_state.dart';
 import 'package:test_jaguar/protocols/st407_remote/st407_screen.dart';
 
+/// Lo que la UI necesita para dibujarse.
+///
+/// Reusa las clases de estado de cada protocolo en vez de volver a aplanarlas:
+/// son inmutables y no dependen de Flutter, así que el controller sólo las pasa
+/// de largo. Lo único propio de la UI son los topes de los sliders del modo
+/// Manual, que no viajan por BLE ni los conoce el protocolo.
 class SimulatorViewState {
   const SimulatorViewState({
     required this.bleEnabled,
@@ -14,40 +18,26 @@ class SimulatorViewState {
     required this.lastReceivedCommand,
     required this.running,
     required this.sendProtocol,
-    required this.st407Screen,
     required this.phaseName,
     required this.weight,
     required this.sensorInduc,
     required this.estBalanza,
     required this.weightHoldSecondsRemaining,
     required this.humidity,
-    required this.manualTara,
-    required this.manualTaraMax,
-    required this.manualHold,
-    required this.manualVbat,
-    required this.manualWeight,
-    required this.manualWeightMax,
-    required this.manualEstBalanza,
-    required this.manualHumidity,
-    required this.manualSensorInduc,
     required this.serviceUuid,
     required this.characteristicUuid,
     required this.serviceWriteUuid,
     required this.characteristicWriteUuid,
     required this.lastJson,
     required this.logs,
-    required this.tomaFuerza,
-    required this.tomaFuerzaRpm,
-    required this.errorEcu,
-    required this.tuboPosicion,
-    required this.guillotinaPosicion,
-    required this.hydraulicDischargeActive,
-    required this.hydraulicDischargePaused,
-    required this.hydraulicInitialPeso,
-    required this.hydraulicTargetPeso,
-    this.lastHydraulicInicio,
-    this.lastHydraulicMovimiento,
+    required this.st407Screen,
+    required this.manual,
+    required this.manualTaraMax,
+    required this.manualWeightMax,
+    required this.hidraulico,
   });
+
+  // --- Comunes ---
 
   final bool bleEnabled;
   final bool advertising;
@@ -56,49 +46,31 @@ class SimulatorViewState {
   final String? lastReceivedCommand;
   final bool running;
   final SendProtocol sendProtocol;
-  final St407Screen st407Screen;
   final String phaseName;
   final int weight;
   final int sensorInduc;
   final int estBalanza;
   final int weightHoldSecondsRemaining;
   final double humidity;
-  final int manualTara;
-  final int manualTaraMax;
-  final int manualHold;
-  final double manualVbat;
-  final int manualWeight;
-  final int manualWeightMax;
-  final int manualEstBalanza;
-  final double manualHumidity;
-  final int manualSensorInduc;
   final String serviceUuid;
   final String characteristicUuid;
   final String serviceWriteUuid;
   final String characteristicWriteUuid;
   final String lastJson;
   final List<String> logs;
-  final int tomaFuerza;
 
-  /// RPM simuladas de la toma de fuerza (solo viajan en el JSON con la
-  /// toma de fuerza encendida).
-  final int tomaFuerzaRpm;
-  final String errorEcu;
-  /// Posición del tubo en pasos (`HydraulicActuatorPosition.closed` ..
-  /// `HydraulicActuatorPosition.open`).
-  final int tuboPosicion;
+  // --- Por protocolo ---
 
-  /// Posición de la guillotina en pasos (misma escala que [tuboPosicion]).
-  final int guillotinaPosicion;
-  final bool hydraulicDischargeActive;
+  final St407Screen st407Screen;
 
-  /// Descarga en curso pero pausada por `AT+DETENER`: el peso queda
-  /// congelado hasta que llegue `AT+REANUDAR`.
-  final bool hydraulicDischargePaused;
-  final double hydraulicInitialPeso;
-  final double hydraulicTargetPeso;
-  final HydraulicDischargeCommand? lastHydraulicInicio;
-  final HydraulicMovementCommand? lastHydraulicMovimiento;
+  /// Valores del modo Manual.
+  final ScaleMeasurement manual;
+
+  /// Topes de los sliders del modo Manual. Son sólo de la UI.
+  final int manualTaraMax;
+  final int manualWeightMax;
+
+  final HydraulicState hidraulico;
 
   static const SimulatorViewState initial = SimulatorViewState(
     bleEnabled: false,
@@ -108,37 +80,23 @@ class SimulatorViewState {
     lastReceivedCommand: null,
     running: false,
     sendProtocol: SendProtocol.jaguarBle,
-    st407Screen: St407Screen.main,
     phaseName: 'loadedWaiting',
     weight: 0,
     sensorInduc: 0,
     estBalanza: 1,
     weightHoldSecondsRemaining: 0,
     humidity: 10.0,
-    manualTara: 0,
-    manualTaraMax: 22000,
-    manualHold: 1,
-    manualVbat: 3.9,
-    manualWeight: 0,
-    manualWeightMax: 22000,
-    manualEstBalanza: 1,
-    manualHumidity: 10.0,
-    manualSensorInduc: 0,
     serviceUuid: '',
     characteristicUuid: '',
     serviceWriteUuid: '',
     characteristicWriteUuid: '',
     lastJson: '{}',
     logs: <String>[],
-    tomaFuerza: HydraulicPtoState.off,
-    tomaFuerzaRpm: HydraulicPtoRpm.defaultValue,
-    errorEcu: '',
-    tuboPosicion: HydraulicActuatorPosition.closed,
-    guillotinaPosicion: HydraulicActuatorPosition.closed,
-    hydraulicDischargeActive: false,
-    hydraulicDischargePaused: false,
-    hydraulicInitialPeso: 0.0,
-    hydraulicTargetPeso: 0.0,
+    st407Screen: St407Screen.main,
+    manual: ScaleMeasurement.baseline,
+    manualTaraMax: 22000,
+    manualWeightMax: 22000,
+    hidraulico: HydraulicState.initial,
   );
 
   SimulatorViewState copyWith({
@@ -149,39 +107,23 @@ class SimulatorViewState {
     String? lastReceivedCommand,
     bool? running,
     SendProtocol? sendProtocol,
-    St407Screen? st407Screen,
     String? phaseName,
     int? weight,
     int? sensorInduc,
     int? estBalanza,
     int? weightHoldSecondsRemaining,
     double? humidity,
-    int? manualTara,
-    int? manualTaraMax,
-    int? manualHold,
-    double? manualVbat,
-    int? manualWeight,
-    int? manualWeightMax,
-    int? manualEstBalanza,
-    double? manualHumidity,
-    int? manualSensorInduc,
     String? serviceUuid,
     String? characteristicUuid,
     String? serviceWriteUuid,
     String? characteristicWriteUuid,
     String? lastJson,
     List<String>? logs,
-    int? tomaFuerza,
-    int? tomaFuerzaRpm,
-    String? errorEcu,
-    int? tuboPosicion,
-    int? guillotinaPosicion,
-    bool? hydraulicDischargeActive,
-    bool? hydraulicDischargePaused,
-    double? hydraulicInitialPeso,
-    double? hydraulicTargetPeso,
-    HydraulicDischargeCommand? lastHydraulicInicio,
-    HydraulicMovementCommand? lastHydraulicMovimiento,
+    St407Screen? st407Screen,
+    ScaleMeasurement? manual,
+    int? manualTaraMax,
+    int? manualWeightMax,
+    HydraulicState? hidraulico,
   }) {
     return SimulatorViewState(
       bleEnabled: bleEnabled ?? this.bleEnabled,
@@ -191,7 +133,6 @@ class SimulatorViewState {
       lastReceivedCommand: lastReceivedCommand ?? this.lastReceivedCommand,
       running: running ?? this.running,
       sendProtocol: sendProtocol ?? this.sendProtocol,
-      st407Screen: st407Screen ?? this.st407Screen,
       phaseName: phaseName ?? this.phaseName,
       weight: weight ?? this.weight,
       sensorInduc: sensorInduc ?? this.sensorInduc,
@@ -199,15 +140,6 @@ class SimulatorViewState {
       weightHoldSecondsRemaining:
           weightHoldSecondsRemaining ?? this.weightHoldSecondsRemaining,
       humidity: humidity ?? this.humidity,
-      manualTara: manualTara ?? this.manualTara,
-      manualTaraMax: manualTaraMax ?? this.manualTaraMax,
-      manualHold: manualHold ?? this.manualHold,
-      manualVbat: manualVbat ?? this.manualVbat,
-      manualWeight: manualWeight ?? this.manualWeight,
-      manualWeightMax: manualWeightMax ?? this.manualWeightMax,
-      manualEstBalanza: manualEstBalanza ?? this.manualEstBalanza,
-      manualHumidity: manualHumidity ?? this.manualHumidity,
-      manualSensorInduc: manualSensorInduc ?? this.manualSensorInduc,
       serviceUuid: serviceUuid ?? this.serviceUuid,
       characteristicUuid: characteristicUuid ?? this.characteristicUuid,
       serviceWriteUuid: serviceWriteUuid ?? this.serviceWriteUuid,
@@ -215,20 +147,11 @@ class SimulatorViewState {
           characteristicWriteUuid ?? this.characteristicWriteUuid,
       lastJson: lastJson ?? this.lastJson,
       logs: logs ?? this.logs,
-      tomaFuerza: tomaFuerza ?? this.tomaFuerza,
-      tomaFuerzaRpm: tomaFuerzaRpm ?? this.tomaFuerzaRpm,
-      errorEcu: errorEcu ?? this.errorEcu,
-      tuboPosicion: tuboPosicion ?? this.tuboPosicion,
-      guillotinaPosicion: guillotinaPosicion ?? this.guillotinaPosicion,
-      hydraulicDischargeActive:
-          hydraulicDischargeActive ?? this.hydraulicDischargeActive,
-      hydraulicDischargePaused:
-          hydraulicDischargePaused ?? this.hydraulicDischargePaused,
-      hydraulicInitialPeso: hydraulicInitialPeso ?? this.hydraulicInitialPeso,
-      hydraulicTargetPeso: hydraulicTargetPeso ?? this.hydraulicTargetPeso,
-      lastHydraulicInicio: lastHydraulicInicio ?? this.lastHydraulicInicio,
-      lastHydraulicMovimiento:
-          lastHydraulicMovimiento ?? this.lastHydraulicMovimiento,
+      st407Screen: st407Screen ?? this.st407Screen,
+      manual: manual ?? this.manual,
+      manualTaraMax: manualTaraMax ?? this.manualTaraMax,
+      manualWeightMax: manualWeightMax ?? this.manualWeightMax,
+      hidraulico: hidraulico ?? this.hidraulico,
     );
   }
 }

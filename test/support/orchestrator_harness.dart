@@ -170,13 +170,13 @@ class Harness {
 
   int get manualEstBalanza => latest.manualMeasurement.estBalanza;
 
-  bool get hydraulicActive => latest.hydraulicDischargeActive;
+  bool get hydraulicActive => latest.hidraulico.dischargeActive;
 
-  bool get hydraulicPaused => latest.hydraulicDischargePaused;
+  bool get hydraulicPaused => latest.hidraulico.dischargePaused;
 
-  double get hydraulicInitialPeso => latest.hydraulicInitialPeso;
+  double get hydraulicInitialPeso => latest.hidraulico.initialPeso;
 
-  double get hydraulicTargetPeso => latest.hydraulicTargetPeso;
+  double get hydraulicTargetPeso => latest.hidraulico.targetPeso;
 
   // --- acciones ---
 

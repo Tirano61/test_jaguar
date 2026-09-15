@@ -10,7 +10,6 @@ import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
 import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_discharge_command.dart';
 import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_movement_command.dart';
 import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_protocol.dart';
-import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_state.dart';
 import 'package:test_jaguar/protocols/manual/manual_protocol.dart';
 import 'package:test_jaguar/protocols/protocol_registry.dart';
 import 'package:test_jaguar/protocols/shared/scale_automatisms.dart';
@@ -112,10 +111,11 @@ class SimulatorOrchestrator {
       _hydraulic.resetRunState();
     }
 
-    _emit(_withHydraulicSnapshot(_current.copyWith(
+    _emit(_current.copyWith(
       sendProtocol: _sendProtocol,
       bleUuids: _protocol.bleUuids,
-    )));
+      hidraulico: _hydraulic.state,
+    ));
     _pushLog('Protocolo seleccionado: ${protocol.label}');
     await _sendCurrentPayloadNow();
   }
@@ -327,43 +327,18 @@ class SimulatorOrchestrator {
     }
 
     _emit(
-      _withHydraulicSnapshot(
-        _current.copyWith(
-          measurement: measurement,
-          sendProtocol: _sendProtocol,
-          bleUuids: _protocol.bleUuids,
-          st407Screen: _st407.screen,
-          manualMeasurement: _manual.measurement,
-          weightHoldSecondsRemaining: weightHoldSecondsRemaining,
-          lastJson: payload,
-        ),
+      _current.copyWith(
+        measurement: measurement,
+        sendProtocol: _sendProtocol,
+        bleUuids: _protocol.bleUuids,
+        st407Screen: _st407.screen,
+        manualMeasurement: _manual.measurement,
+        hidraulico: _hydraulic.state,
+        weightHoldSecondsRemaining: weightHoldSecondsRemaining,
+        lastJson: payload,
       ),
     );
   }
-
-  /// Proyecta el estado del módulo Hidráulico en el DTO.
-  ///
-  /// Sigue aplanando los campos porque el DTO todavía los tiene sueltos; al
-  /// partirlo en sub-objetos por protocolo esto pasa a ser `hidraulico: state`.
-  SimulatorStatusDto _withHydraulicSnapshot(SimulatorStatusDto value) {
-    final HydraulicState state = _hydraulic.state;
-    return value.copyWith(
-      tomaFuerza: state.tomaFuerza,
-      tomaFuerzaRpm: state.tomaFuerzaRpm,
-      errorEcu: state.errorEcu,
-      tuboPosicion: state.tuboPosicion,
-      guillotinaPosicion: state.guillotinaPosicion,
-      hydraulicDischargeActive: state.dischargeActive,
-      hydraulicDischargePaused: state.dischargePaused,
-      hydraulicInitialPeso: state.initialPeso,
-      hydraulicTargetPeso: state.targetPeso,
-      lastHydraulicInicio: state.lastInicio,
-      lastHydraulicMovimiento: state.lastMovimiento,
-    );
-  }
-
-  // El armado de la trama ya no se pregunta por el protocolo: lo hace cada
-  // módulo. Ver `_protocol.encodePayload` en `_notifyAndEmitMeasurement`.
 
   /// De dónde sale el peso en cada modo. Es la única tabla de despacho por
   /// protocolo que queda: cada rama delega en un módulo.
