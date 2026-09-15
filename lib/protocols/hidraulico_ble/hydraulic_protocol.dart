@@ -164,6 +164,7 @@ class HydraulicProtocol implements SimulatorProtocol {
         : HydraulicSaveEvent.guardar;
   }
 
+  @override
   String encodePayload(ScaleMeasurement measurement) {
     return HydraulicPayloadDto(
       measurement: measurement,
