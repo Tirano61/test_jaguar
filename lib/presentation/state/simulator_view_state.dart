@@ -1,7 +1,7 @@
-import 'package:test_jaguar/domain/value_objects/hydraulic_actuator_position.dart';
-import 'package:test_jaguar/domain/value_objects/hydraulic_discharge_command.dart';
-import 'package:test_jaguar/domain/value_objects/hydraulic_movement_command.dart';
-import 'package:test_jaguar/domain/value_objects/hydraulic_pto.dart';
+import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_actuator_position.dart';
+import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_discharge_command.dart';
+import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_movement_command.dart';
+import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_pto.dart';
 import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
 import 'package:test_jaguar/domain/value_objects/st407_screen.dart';
 

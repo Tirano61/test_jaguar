@@ -25,10 +25,10 @@ class ProtocolRegistry {
 
   /// El juego completo de protocolos de la app.
   factory ProtocolRegistry.standard() {
-    return ProtocolRegistry(const <SimulatorProtocol>[
-      JaguarBleProtocol(),
-      St407RemoteProtocol(),
-      ManualProtocol(),
+    return ProtocolRegistry(<SimulatorProtocol>[
+      const JaguarBleProtocol(),
+      const St407RemoteProtocol(),
+      const ManualProtocol(),
       HydraulicProtocol(),
     ]);
   }

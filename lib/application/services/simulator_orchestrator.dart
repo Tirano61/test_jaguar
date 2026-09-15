@@ -1,20 +1,19 @@
 import 'dart:async';
 
-import 'package:test_jaguar/application/dto/hydraulic_payload_dto.dart';
 import 'package:test_jaguar/application/dto/scale_payload_dto.dart';
-import 'package:test_jaguar/application/dto/st407_payload_dto.dart';
 import 'package:test_jaguar/application/dto/simulator_status_dto.dart';
+import 'package:test_jaguar/application/dto/st407_payload_dto.dart';
 import 'package:test_jaguar/core/extensions/stream_subscription_extensions.dart';
 import 'package:test_jaguar/domain/entities/ble_peripheral_status.dart';
 import 'package:test_jaguar/domain/entities/scale_measurement.dart';
 import 'package:test_jaguar/domain/repositories/ble_peripheral_repository.dart';
 import 'package:test_jaguar/domain/repositories/scale_simulation_repository.dart';
-import 'package:test_jaguar/domain/value_objects/hydraulic_actuator_position.dart';
-import 'package:test_jaguar/domain/value_objects/hydraulic_discharge_command.dart';
-import 'package:test_jaguar/domain/value_objects/hydraulic_movement_command.dart';
-import 'package:test_jaguar/domain/value_objects/hydraulic_pto.dart';
 import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
 import 'package:test_jaguar/domain/value_objects/st407_screen.dart';
+import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_discharge_command.dart';
+import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_movement_command.dart';
+import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_protocol.dart';
+import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_state.dart';
 import 'package:test_jaguar/protocols/protocol_registry.dart';
 import 'package:test_jaguar/protocols/simulator_protocol.dart';
 
@@ -35,6 +34,12 @@ class SimulatorOrchestrator {
   /// anunciar y cómo enmarcar el payload, en vez de que lo decida un `if` acá.
   SimulatorProtocol get _protocol => _registry.of(_sendProtocol);
 
+  /// El módulo Hidráulico BLE, que es dueño de su estado y de su máquina de
+  /// descarga. Se accede aunque no sea el protocolo activo: su configuración
+  /// (toma de fuerza, errorEcu) sigue viva entre cambios de modo.
+  HydraulicProtocol get _hydraulic =>
+      _registry.of(SendProtocol.hidraulicoBle) as HydraulicProtocol;
+
   final StreamController<SimulatorStatusDto> _statusController =
       StreamController<SimulatorStatusDto>.broadcast();
 
@@ -48,15 +53,6 @@ class SimulatorOrchestrator {
   static const String _stopDischargeCommand = 'AT+DETENER';
   static const String _resumeDischargeCommand = 'AT+REANUDAR';
   static const String _finishDischargeCommand = 'AT+FINALIZAR';
-
-  // Eventos que el simulador NOTIFICA a la app (los de arriba son los que
-  // recibe por characteristic write).
-  static const String _guardarEvent = 'AT+GUARDAR';
-
-  /// Cierre de la primera descarga del modo "dos descargas" (`modo = 2` en
-  /// `AT+INICIO`): la app guarda/imprime/envía igual que con [_guardarEvent],
-  /// pero se queda en descarga y manda un segundo `AT+INICIO` en modo 1.
-  static const String _guardarDosEvent = 'AT+GUARDARDOS';
 
   SendProtocol _sendProtocol = SendProtocol.jaguarBle;
   St407Screen _st407Screen = St407Screen.main;
@@ -77,41 +73,6 @@ class SimulatorOrchestrator {
   int? _heldWeight;
   SimulatorStatusDto _current = SimulatorStatusDto.initial;
 
-  // --- Estado modo Hidráulico BLE ---
-  // Peso/sensor propios de este modo: no dependen del motor de simulación
-  // automático (no hay ciclo de fases acá). sensorInduc queda siempre en 0
-  // (carga) — la transición carga/descarga la maneja la app conectada por
-  // AT+INICIO/AT+GUARDAR, no el sensor. peso solo cambia si el tester lo
-  // edita a mano o por una descarga activa iniciada con AT+INICIO.
-  ScaleMeasurement _hydraulicMeasurement = ScaleMeasurement.baseline;
-  int _tomaFuerza = HydraulicPtoState.off;
-  // RPM simuladas de la toma de fuerza: se configuran siempre, pero solo
-  // salen en el JSON cuando _tomaFuerza está en encendida.
-  int _tomaFuerzaRpm = HydraulicPtoRpm.defaultValue;
-  String _errorEcu = '';
-  // Posición de cada actuador en pasos discretos (0 cerrado .. 5 abierto):
-  // cada AT+MOVIMIENTO mueve un paso hasta el tope correspondiente.
-  int _tuboPosicion = HydraulicActuatorPosition.closed;
-  int _guillotinaPosicion = HydraulicActuatorPosition.closed;
-  HydraulicDischargeCommand? _lastHydraulicInicio;
-  HydraulicMovementCommand? _lastHydraulicMovimiento;
-  bool _hydraulicDischargeActive = false;
-  // AT+DETENER pausa la descarga en curso (no la cancela): el peso queda
-  // congelado y los parámetros de la corrida (objetivo, velocidad) se
-  // conservan hasta que llegue AT+REANUDAR.
-  bool _hydraulicDischargePaused = false;
-  bool _hydraulicJustCompleted = false;
-  // Evento de guardado prometido por el AT+INICIO que inició la corrida en
-  // curso: modo 2 ("dos descargas") cierra con AT+GUARDARDOS y el resto con
-  // AT+GUARDAR. Se congela al iniciar la descarga, como el objetivo y la
-  // velocidad, y no se deduce de _lastHydraulicInicio al completar, porque ese
-  // campo también guarda los AT+INICIO inválidos y los que lleguen mientras la
-  // descarga baja.
-  bool _hydraulicSaveAsDosDescargas = false;
-  double _hydraulicCurrentDisplayedPeso = 0.0;
-  double _hydraulicInitialPeso = 0.0;
-  double _hydraulicTargetPeso = 0.0;
-  double _hydraulicDecrementPerTick = 0.0;
   int _lastProcessedCommandSequence = -1;
 
   double get selectedHumidity => _selectedHumidity;
@@ -153,15 +114,7 @@ class SimulatorOrchestrator {
     // protocolo (tomaFuerza/errorEcu se conservan, son configuración, no
     // estado de una corrida en curso).
     if (_sendProtocol != SendProtocol.hidraulicoBle) {
-      _hydraulicDischargeActive = false;
-      _hydraulicDischargePaused = false;
-      _hydraulicSaveAsDosDescargas = false;
-      _hydraulicCurrentDisplayedPeso = 0.0;
-      _hydraulicInitialPeso = 0.0;
-      _hydraulicTargetPeso = 0.0;
-      _hydraulicDecrementPerTick = 0.0;
-      _tuboPosicion = HydraulicActuatorPosition.closed;
-      _guillotinaPosicion = HydraulicActuatorPosition.closed;
+      _hydraulic.resetRunState();
     }
 
     _emit(_withHydraulicSnapshot(_current.copyWith(
@@ -172,73 +125,42 @@ class SimulatorOrchestrator {
     await _sendCurrentPayloadNow();
   }
 
-  Future<void> setHydraulicPeso(int value) async {
-    if (_hydraulicDischargeActive) {
-      return; // no se edita a mano mientras hay una descarga en curso
-    }
-    final int next = value.clamp(0, 22000);
-    if (_hydraulicMeasurement.peso == next) {
-      return;
-    }
-    _hydraulicMeasurement = _hydraulicMeasurement.copyWith(peso: next);
-    _pushLog('Peso hidráulico configurado: $next kg');
-    await _sendCurrentPayloadNow();
-  }
+  // La configuración del modo Hidráulico vive en su módulo; acá sólo se
+  // publica el log que devuelve y se empuja el payload.
 
-  Future<void> setTomaFuerza(int value) async {
-    final int next = value.clamp(
-      HydraulicPtoState.off,
-      HydraulicPtoState.requestOff,
-    );
-    if (_tomaFuerza == next) {
-      return;
-    }
-    _tomaFuerza = next;
-    final int rpmEnviadas =
-        HydraulicPtoState.isOn(_tomaFuerza) ? _tomaFuerzaRpm : 0;
-    _pushLog(
-      'Toma de fuerza configurada: $_tomaFuerza '
-      '(rpm enviadas: $rpmEnviadas)',
-    );
-    await _sendCurrentPayloadNow();
-  }
+  Future<void> setHydraulicPeso(int value) =>
+      _applyHydraulicConfig(_hydraulic.setPeso(value));
+
+  Future<void> setTomaFuerza(int value) =>
+      _applyHydraulicConfig(_hydraulic.setTomaFuerza(value));
 
   /// RPM simuladas de la toma de fuerza. Se pueden configurar en cualquier
   /// estado, pero el JSON solo las manda con la toma de fuerza encendida.
-  Future<void> setTomaFuerzaRpm(int value) async {
-    final int next = HydraulicPtoRpm.clamp(value);
-    if (_tomaFuerzaRpm == next) {
-      return;
-    }
-    _tomaFuerzaRpm = next;
-    _pushLog(
-      HydraulicPtoState.isOn(_tomaFuerza)
-          ? 'RPM toma de fuerza configuradas: $_tomaFuerzaRpm'
-          : 'RPM toma de fuerza configuradas: $_tomaFuerzaRpm '
-              '(se envía rpm: 0 hasta que tomaFuerza sea '
-              '${HydraulicPtoState.on})',
-    );
-    await _sendCurrentPayloadNow();
-  }
+  Future<void> setTomaFuerzaRpm(int value) =>
+      _applyHydraulicConfig(_hydraulic.setTomaFuerzaRpm(value));
 
-  Future<void> setErrorEcu(String value) async {
-    if (_errorEcu == value) {
+  Future<void> setErrorEcu(String value) =>
+      _applyHydraulicConfig(_hydraulic.setErrorEcu(value));
+
+  /// [log] en null significa que el módulo no aplicó ningún cambio: no hay
+  /// nada que loguear ni que reenviar.
+  Future<void> _applyHydraulicConfig(String? log) async {
+    if (log == null) {
       return;
     }
-    _errorEcu = value;
-    _pushLog('errorEcu configurado: "$_errorEcu"');
+    _pushLog(log);
     await _sendCurrentPayloadNow();
   }
 
   /// Envía el evento `AT+GUARDAR` crudo por notify BLE. Lo usa el botón manual
   /// de la UI, que siempre manda el cierre clásico; el disparo automático al
-  /// completar una descarga pasa por [_sendSaveEvent], que manda
+  /// completar una descarga pasa igual por [_sendSaveEvent], pero manda
   /// `AT+GUARDARDOS` cuando la corrida se inició con modo 2.
-  Future<void> sendGuardarEvent() => _sendSaveEvent(_guardarEvent);
+  Future<void> sendGuardarEvent() =>
+      _sendSaveEvent(HydraulicSaveEvent.guardar);
 
-  /// Notifica uno de los eventos de guardado crudos ([_guardarEvent] o
-  /// [_guardarDosEvent]). Centralizado para que el terminador `\r\n` no se
-  /// pueda desincronizar entre los dos.
+  /// Notifica uno de los eventos de guardado crudos. Centralizado para que el
+  /// terminador `\r\n` no se pueda desincronizar entre los dos.
   Future<void> _sendSaveEvent(String event) async {
     try {
       await _bleRepository.notifyUtf8Json('$event\r\n');
@@ -361,15 +283,14 @@ class SimulatorOrchestrator {
                   : _weightHoldTicksRemaining,
         );
 
-        if (_hydraulicJustCompleted) {
-          _hydraulicJustCompleted = false;
-          // Copia local antes del await: el listener de watchStatus() puede
-          // intercalarse acá y procesar un AT+INICIO nuevo, que pisaría el
-          // evento prometido por la corrida que se está cerrando.
-          final bool dosDescargas = _hydraulicSaveAsDosDescargas;
-          _hydraulicSaveAsDosDescargas = false;
-          final String saveEvent =
-              dosDescargas ? _guardarDosEvent : _guardarEvent;
+        // Se drena DESPUÉS de notificar el payload del tick, para que la app
+        // vea la tolva en su peso final antes de que le pidan guardar. El
+        // módulo lo entrega una sola vez, así que un AT+INICIO que se
+        // intercale no puede pisar el evento de la corrida que está cerrando.
+        final String? saveEvent = _hydraulic.takeCompletedSaveEvent();
+        if (saveEvent != null) {
+          final bool dosDescargas =
+              saveEvent == HydraulicSaveEvent.guardarDos;
           _pushLog(
             'Descarga hidráulica completada (peso objetivo alcanzado): '
             'enviando $saveEvent'
@@ -382,17 +303,6 @@ class SimulatorOrchestrator {
     );
   }
 
-  /// Medición vigente del modo Hidráulico BLE. Mientras una descarga corre el
-  /// peso vive en [_hydraulicCurrentDisplayedPeso] y no en
-  /// [_hydraulicMeasurement], que sólo se fija al pausar, finalizar o
-  /// completar la corrida.
-  ScaleMeasurement get _currentHydraulicMeasurement {
-    final ScaleMeasurement base =
-        _hydraulicMeasurement.copyWith(humedad: _selectedHumidity);
-    return _hydraulicDischargeActive
-        ? base.copyWith(peso: _hydraulicCurrentDisplayedPeso.round())
-        : base;
-  }
 
   Future<void> _sendCurrentPayloadNow() async {
     // El peso del modo hidráulico no pasa por el motor de simulación: leer
@@ -403,7 +313,7 @@ class SimulatorOrchestrator {
     if (_sendProtocol == SendProtocol.manual) {
       measurement = _manualMeasurement;
     } else if (_sendProtocol == SendProtocol.hidraulicoBle) {
-      measurement = _currentHydraulicMeasurement;
+      measurement = _hydraulic.measurement(humidity: _selectedHumidity);
     } else {
       measurement = _current.measurement.copyWith(humedad: _selectedHumidity);
     }
@@ -440,30 +350,30 @@ class SimulatorOrchestrator {
     );
   }
 
+  /// Proyecta el estado del módulo Hidráulico en el DTO.
+  ///
+  /// Sigue aplanando los campos porque el DTO todavía los tiene sueltos; al
+  /// partirlo en sub-objetos por protocolo esto pasa a ser `hidraulico: state`.
   SimulatorStatusDto _withHydraulicSnapshot(SimulatorStatusDto value) {
+    final HydraulicState state = _hydraulic.state;
     return value.copyWith(
-      tomaFuerza: _tomaFuerza,
-      tomaFuerzaRpm: _tomaFuerzaRpm,
-      errorEcu: _errorEcu,
-      tuboPosicion: _tuboPosicion,
-      guillotinaPosicion: _guillotinaPosicion,
-      hydraulicDischargeActive: _hydraulicDischargeActive,
-      hydraulicDischargePaused: _hydraulicDischargePaused,
-      hydraulicInitialPeso: _hydraulicInitialPeso,
-      hydraulicTargetPeso: _hydraulicTargetPeso,
-      lastHydraulicInicio: _lastHydraulicInicio,
-      lastHydraulicMovimiento: _lastHydraulicMovimiento,
+      tomaFuerza: state.tomaFuerza,
+      tomaFuerzaRpm: state.tomaFuerzaRpm,
+      errorEcu: state.errorEcu,
+      tuboPosicion: state.tuboPosicion,
+      guillotinaPosicion: state.guillotinaPosicion,
+      hydraulicDischargeActive: state.dischargeActive,
+      hydraulicDischargePaused: state.dischargePaused,
+      hydraulicInitialPeso: state.initialPeso,
+      hydraulicTargetPeso: state.targetPeso,
+      lastHydraulicInicio: state.lastInicio,
+      lastHydraulicMovimiento: state.lastMovimiento,
     );
   }
 
   String _payloadForCurrentProtocol(ScaleMeasurement measurement) {
     if (_sendProtocol == SendProtocol.hidraulicoBle) {
-      return HydraulicPayloadDto(
-        measurement: measurement,
-        tomaFuerza: _tomaFuerza,
-        tomaFuerzaRpm: _tomaFuerzaRpm,
-        errorEcu: _errorEcu,
-      ).toJsonUtf8String();
+      return _hydraulic.encodePayload(measurement);
     }
 
     if (_sendProtocol == SendProtocol.st407Remote) {
@@ -543,22 +453,7 @@ class SimulatorOrchestrator {
     if (_sendProtocol == SendProtocol.hidraulicoBle) {
       // Sólo una descarga en curso y no pausada por AT+DETENER baja el peso
       // en este tick: pausada, queda donde estaba y la corrida sigue viva
-      // hasta que llegue AT+REANUDAR.
-      if (_hydraulicDischargeActive && !_hydraulicDischargePaused) {
-        final double next =
-            _hydraulicCurrentDisplayedPeso - _hydraulicDecrementPerTick;
-        if (next <= _hydraulicTargetPeso) {
-          _hydraulicCurrentDisplayedPeso = _hydraulicTargetPeso;
-          _hydraulicDischargeActive = false;
-          _hydraulicJustCompleted = true;
-          _hydraulicMeasurement = _hydraulicMeasurement.copyWith(
-            peso: _hydraulicCurrentDisplayedPeso.round(),
-          );
-        } else {
-          _hydraulicCurrentDisplayedPeso = next;
-        }
-      }
-      return _currentHydraulicMeasurement;
+      return _hydraulic.advance(humidity: _selectedHumidity);
     }
 
     ScaleMeasurement base = measurement.copyWith(humedad: _selectedHumidity);
@@ -736,7 +631,7 @@ class SimulatorOrchestrator {
 
     if (_isStopDischargeCommand(normalizedCommand)) {
       if (_sendProtocol == SendProtocol.hidraulicoBle) {
-        await _applyHydraulicDetener();
+        await _applyHydraulicCommand(_hydraulic.applyDetener());
       } else {
         _pushLog(
           'AT+DETENER recibido pero se ignora: seleccioná "Hidráulico BLE" '
@@ -748,7 +643,7 @@ class SimulatorOrchestrator {
 
     if (_isResumeDischargeCommand(normalizedCommand)) {
       if (_sendProtocol == SendProtocol.hidraulicoBle) {
-        await _applyHydraulicReanudar();
+        await _applyHydraulicCommand(_hydraulic.applyReanudar());
       } else {
         _pushLog(
           'AT+REANUDAR recibido pero se ignora: seleccioná "Hidráulico BLE" '
@@ -760,7 +655,7 @@ class SimulatorOrchestrator {
 
     if (_isFinishDischargeCommand(normalizedCommand)) {
       if (_sendProtocol == SendProtocol.hidraulicoBle) {
-        await _applyHydraulicFinalizar();
+        await _applyHydraulicCommand(_hydraulic.applyFinalizar());
       } else {
         _pushLog(
           'AT+FINALIZAR recibido pero se ignora: seleccioná "Hidráulico BLE" '
@@ -774,7 +669,7 @@ class SimulatorOrchestrator {
         HydraulicDischargeCommand.tryParse(normalizedCommand);
     if (inicio != null) {
       if (_sendProtocol == SendProtocol.hidraulicoBle) {
-        await _applyHydraulicInicio(inicio);
+        await _applyHydraulicCommand(_hydraulic.applyInicio(inicio));
       } else {
         _pushLog(
           'AT+INICIO recibido pero se ignora: seleccioná "Hidráulico BLE" '
@@ -788,7 +683,8 @@ class SimulatorOrchestrator {
         HydraulicMovementCommand.tryParse(normalizedCommand);
     if (movimiento != null) {
       if (_sendProtocol == SendProtocol.hidraulicoBle) {
-        await _applyHydraulicMovimiento(movimiento);
+        await _applyHydraulicCommand(
+            _hydraulic.applyMovimiento(movimiento));
       } else {
         _pushLog(
           'AT+MOVIMIENTO recibido pero se ignora: seleccioná "Hidráulico BLE" '
@@ -799,209 +695,14 @@ class SimulatorOrchestrator {
     }
   }
 
-  Future<void> _applyHydraulicInicio(HydraulicDischargeCommand command) async {
-    _lastHydraulicInicio = command;
-
-    final int currentPeso = _currentHydraulicMeasurement.peso;
-    final bool validRange = command.hasValidRange;
-    // Igual al peso de la tolva es válido: así es como el firmware recibe una
-    // descarga total (se le manda todo el contenido y la vacía). Lo único que
-    // no se puede pedir es descargar más de lo que hay.
-    final bool validAgainstCurrent = command.kgDescarga <= currentPeso;
-
-    if (!validRange || !validAgainstCurrent) {
-      _pushLog(
-        'AT+INICIO recibido con parámetros inválidos (${command.summary}): '
-        'se requiere kgDescarga > kgTubo y kgDescarga <= peso actual '
-        '($currentPeso kg). No se inicia la descarga simulada.',
-      );
-      await _sendCurrentPayloadNow();
-      return;
-    }
-
-    _hydraulicCurrentDisplayedPeso = currentPeso.toDouble();
-    _hydraulicInitialPeso = currentPeso.toDouble();
-    _hydraulicTargetPeso = (currentPeso - command.kgDescarga).toDouble();
-    _hydraulicDecrementPerTick = _hydraulicRateForVelocidad(command.velocidad);
-    _hydraulicDischargeActive = true;
-    _hydraulicDischargePaused = false;
-    _hydraulicSaveAsDosDescargas = command.isDosDescargas;
-
-    // Al descargar el tubo queda totalmente abierto y la guillotina en alguna
-    // posición que no sea "cerrada": si venía cerrada se la lleva al primer
-    // paso de apertura, si ya estaba abierta se respeta donde la dejaron.
-    _tuboPosicion = HydraulicActuatorPosition.open;
-    if (HydraulicActuatorPosition.isClosed(_guillotinaPosicion)) {
-      _guillotinaPosicion = HydraulicActuatorPosition.firstOpenStep;
-    }
-
-    _pushLog(
-      'AT+INICIO recibido: ${command.summary} -> tubo '
-      '${HydraulicActuatorPosition.label(_tuboPosicion)}, guillotina '
-      '${HydraulicActuatorPosition.label(_guillotinaPosicion)}, cierra con '
-      '${_hydraulicSaveAsDosDescargas ? _guardarDosEvent : _guardarEvent}',
-    );
+  /// Publica el log que devolvió un comando hidráulico y empuja el payload.
+  /// Todos los comandos del modo hacen las dos cosas, incluidos los que no
+  /// cambian nada (por ejemplo `AT+DETENER` sin descarga en curso).
+  Future<void> _applyHydraulicCommand(String log) async {
+    _pushLog(log);
     await _sendCurrentPayloadNow();
   }
 
-  /// `AT+DETENER` **pausa** la descarga simulada en curso: el peso queda
-  /// congelado donde estaba, la corrida sigue viva (objetivo, velocidad y
-  /// posiciones de los actuadores se conservan) y **no** se envía
-  /// `AT+GUARDAR`, porque todavía no se alcanzó el objetivo. La descarga
-  /// retoma desde ese mismo peso al recibir `AT+REANUDAR`.
-  Future<void> _applyHydraulicDetener() async {
-    if (!_hydraulicDischargeActive) {
-      _pushLog('AT+DETENER recibido: no hay descarga en curso');
-      await _sendCurrentPayloadNow();
-      return;
-    }
-
-    if (_hydraulicDischargePaused) {
-      _pushLog('AT+DETENER recibido: la descarga ya estaba pausada');
-      await _sendCurrentPayloadNow();
-      return;
-    }
-
-    _hydraulicDischargePaused = true;
-    // Mientras la descarga corre el peso vive en
-    // _hydraulicCurrentDisplayedPeso: hay que fijarlo en la medición del modo
-    // o el próximo tick volvería al peso previo al AT+INICIO.
-    _hydraulicMeasurement = _hydraulicMeasurement.copyWith(
-      peso: _hydraulicCurrentDisplayedPeso.round(),
-    );
-
-    _pushLog(
-      'AT+DETENER recibido: descarga pausada en '
-      '${_hydraulicMeasurement.peso} kg (objetivo '
-      '${_hydraulicTargetPeso.round()} kg), esperando AT+REANUDAR',
-    );
-    await _sendCurrentPayloadNow();
-  }
-
-  /// `AT+REANUDAR` continúa la descarga que `AT+DETENER` dejó pausada: sigue
-  /// desde el peso en el que había quedado, con el mismo objetivo y la misma
-  /// velocidad del `AT+INICIO` original, y al llegar al objetivo dispara
-  /// `AT+GUARDAR` como cualquier descarga completa.
-  Future<void> _applyHydraulicReanudar() async {
-    if (!_hydraulicDischargeActive) {
-      _pushLog('AT+REANUDAR recibido: no hay descarga pausada');
-      await _sendCurrentPayloadNow();
-      return;
-    }
-
-    if (!_hydraulicDischargePaused) {
-      _pushLog('AT+REANUDAR recibido: la descarga ya venía en curso');
-      await _sendCurrentPayloadNow();
-      return;
-    }
-
-    _hydraulicDischargePaused = false;
-    _pushLog(
-      'AT+REANUDAR recibido: descarga retomada desde '
-      '${_hydraulicCurrentDisplayedPeso.round()} kg (objetivo '
-      '${_hydraulicTargetPeso.round()} kg)',
-    );
-    await _sendCurrentPayloadNow();
-  }
-
-  /// `AT+FINALIZAR` termina la descarga automática sin haber llegado al
-  /// objetivo: el peso queda donde estaba en ese momento y la corrida se
-  /// descarta (no queda nada para reanudar). Sirve tanto con la descarga
-  /// corriendo como pausada por `AT+DETENER`. No se envía `AT+GUARDAR`,
-  /// porque el guardado lo decide la app que finalizó. Los actuadores
-  /// quedan en la posición en la que estaban y vuelven a responder a
-  /// `AT+MOVIMIENTO`.
-  Future<void> _applyHydraulicFinalizar() async {
-    if (!_hydraulicDischargeActive) {
-      _pushLog('AT+FINALIZAR recibido: no hay descarga en curso');
-      await _sendCurrentPayloadNow();
-      return;
-    }
-
-    final bool estabaPausada = _hydraulicDischargePaused;
-    _hydraulicDischargeActive = false;
-    _hydraulicDischargePaused = false;
-    _hydraulicJustCompleted = false;
-    // La corrida se descarta entera: su evento de guardado no puede quedar
-    // pegado para el próximo AT+INICIO.
-    _hydraulicSaveAsDosDescargas = false;
-    // Mientras la descarga corre el peso vive en
-    // _hydraulicCurrentDisplayedPeso: hay que fijarlo en la medición del
-    // modo o el próximo tick volvería al peso previo al AT+INICIO.
-    _hydraulicMeasurement = _hydraulicMeasurement.copyWith(
-      peso: _hydraulicCurrentDisplayedPeso.round(),
-    );
-
-    _pushLog(
-      'AT+FINALIZAR recibido: descarga automática terminada en '
-      '${_hydraulicMeasurement.peso} kg (objetivo '
-      '${_hydraulicTargetPeso.round()} kg'
-      '${estabaPausada ? ', estaba pausada' : ''}), '
-      'no se envía AT+GUARDAR',
-    );
-    await _sendCurrentPayloadNow();
-  }
-
-  Future<void> _applyHydraulicMovimiento(
-    HydraulicMovementCommand command,
-  ) async {
-    _lastHydraulicMovimiento = command;
-
-    // Durante una descarga las posiciones las maneja la descarga misma: los
-    // abrir/cerrar de tubo y guillotina se ignoran hasta que termine. Una
-    // descarga pausada por AT+DETENER sigue siendo una descarga en curso.
-    if (_hydraulicDischargeActive) {
-      _pushLog(
-        'AT+MOVIMIENTO recibido: ${command.label} (tipo=${command.tipo}) -> '
-        'ignorado, hay una descarga en curso'
-        '${_hydraulicDischargePaused ? ' (pausada)' : ''}',
-      );
-      await _sendCurrentPayloadNow();
-      return;
-    }
-
-    final bool? opens = command.opens;
-    if (opens != null && command.affectsTube) {
-      _tuboPosicion = HydraulicActuatorPosition.stepped(
-        _tuboPosicion,
-        opening: opens,
-      );
-      _pushLog(
-        'AT+MOVIMIENTO recibido: ${command.label} (tipo=${command.tipo}) -> '
-        'tubo en ${HydraulicActuatorPosition.label(_tuboPosicion)}',
-      );
-    } else if (opens != null && command.affectsGuillotine) {
-      _guillotinaPosicion = HydraulicActuatorPosition.stepped(
-        _guillotinaPosicion,
-        opening: opens,
-      );
-      _pushLog(
-        'AT+MOVIMIENTO recibido: ${command.label} (tipo=${command.tipo}) -> '
-        'guillotina en ${HydraulicActuatorPosition.label(_guillotinaPosicion)}',
-      );
-    } else {
-      _pushLog(
-        'AT+MOVIMIENTO recibido: ${command.label} (tipo=${command.tipo})',
-      );
-    }
-
-    await _sendCurrentPayloadNow();
-  }
-
-  double _hydraulicRateForVelocidad(int velocidad) {
-    switch (velocidad) {
-      case 1:
-        return 20.0; // lenta
-      case 2:
-        return 50.0; // normal
-      case 3:
-        return 120.0; // rápida
-      case 4:
-        return 70.0; // variable (valor intermedio fijo, sin jitter)
-      default:
-        return 50.0;
-    }
-  }
 
   String _normalizeIncomingCommand(String command) {
     return command

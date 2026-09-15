@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:test_jaguar/domain/value_objects/hydraulic_discharge_command.dart';
+import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_discharge_command.dart';
 
 HydraulicDischargeCommand _inicio({required int modo}) {
   final HydraulicDischargeCommand? command =

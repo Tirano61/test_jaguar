@@ -1,9 +1,9 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:test_jaguar/application/dto/hydraulic_payload_dto.dart';
+import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_payload.dart';
 import 'package:test_jaguar/domain/entities/scale_measurement.dart';
-import 'package:test_jaguar/domain/value_objects/hydraulic_pto.dart';
+import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_pto.dart';
 
 Map<String, dynamic> _payload({
   required int tomaFuerza,
