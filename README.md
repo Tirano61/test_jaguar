@@ -18,7 +18,7 @@ rearma el advertising con el perfil GATT que corresponda.
 | **Jaguar BLE** | Balanza clásica. El peso lo genera el motor de simulación siguiendo un ciclo de carga y descarga | JSON de 7 claves | ABF0 / ABF6 |
 | **Remoto ST407** | Indicador remoto. Se elige qué pantalla mostrar (códigos 100-108) y el simulador notifica su cadena | Cadena separada por coma, con cabecera binaria de 5 bytes | ABF3 |
 | **Manual** | Balanza con los valores fijados a mano desde la UI. Los automatismos están apagados | JSON de 7 claves | ABF0 / ABF6 |
-| **Hidráulico BLE** | Caja de manejo de tubo y guillotina, con descarga automática | JSON de 7 claves + `tomaFuerza`, `rpm` y `errorEcu` | ABF0 / ABF6 |
+| **Hidráulico BLE** | Caja de manejo de tubo y guillotina, con descarga automática | JSON de 7 claves + `tomaFuerza`, `rpm`, `errorEcu`, `tubo` y `gillo` | ABF0 / ABF6 |
 
 ## Cómo se usa
 
@@ -44,6 +44,31 @@ Llegan por *characteristic write* desde la app conectada.
 
 Y notifica `AT+GUARDAR` (o `AT+GUARDARDOS` en el modo dos descargas) cuando una
 descarga hidráulica llega a su objetivo.
+
+### Ciclo de descarga hidráulica
+
+`AT+INICIO` no arranca la descarga en el acto: primero hay que abrir el tubo,
+igual que en el equipo real.
+
+1. Llega `AT+INICIO` → `tubo: 2` (abriendo) durante **6 s**, y la guillotina
+   empieza a abrir hacia **25%**.
+2. Tubo abierto → `tubo: 1`, y recién ahí el peso empieza a bajar.
+3. Mientras dura la descarga, `gillo` salta cada **5 s** a un valor al azar
+   entre **25 y 80** (la válvula regulando caudal).
+4. Se alcanza el objetivo → se notifica `AT+GUARDAR` y el tubo pasa a
+   `tubo: 3` (cerrando) durante **6 s**, con la guillotina cerrando a 0.
+5. `tubo: 0` (cerrado) y la corrida termina.
+
+`AT+MOVIMIENTO` mueve tubo y guillotina a mano, con un recorrido completo de
+**15 s**; invertir la marcha a mitad de camino arranca desde donde quedó, no
+desde el tope. Durante una corrida esos comandos se ignoran.
+
+`AT+FINALIZAR` corta la corrida sin guardar: cierra la guillotina y **deja el
+tubo donde está**.
+
+El tubo y la guillotina se mueven con su propio reloj, que corre aunque la
+simulación esté detenida: en el equipo real el hidráulico no depende de que la
+balanza esté pesando. El peso, en cambio, sólo baja con **Iniciar** apretado.
 
 Un comando que llega al protocolo equivocado se ignora y queda registrado en el
 log, diciendo qué protocolo hay que seleccionar para que funcione.

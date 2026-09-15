@@ -1,13 +1,15 @@
+import 'dart:math';
+
 import 'package:test_jaguar/core/constants/ble_constants.dart';
+import 'package:test_jaguar/core/constants/payload_framing.dart';
 import 'package:test_jaguar/domain/entities/scale_measurement.dart';
 import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
-import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_actuator_position.dart';
+import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_actuators.dart';
 import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_discharge_command.dart';
 import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_movement_command.dart';
 import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_payload.dart';
 import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_pto.dart';
 import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_state.dart';
-import 'package:test_jaguar/core/constants/payload_framing.dart';
 import 'package:test_jaguar/protocols/simulator_protocol.dart';
 
 /// Eventos que el simulador **notifica** a la app al cerrar una descarga.
@@ -20,23 +22,42 @@ abstract final class HydraulicSaveEvent {
   static const String guardarDos = 'AT+GUARDARDOS';
 }
 
+/// Lo que dejó pendiente un paso del reloj de actuadores.
+class HydraulicActuatorTick {
+  const HydraulicActuatorTick({required this.logs, this.saveEvent});
+
+  static const HydraulicActuatorTick none =
+      HydraulicActuatorTick(logs: <String>[]);
+
+  final List<String> logs;
+
+  /// Evento de guardado a notificar, si en este paso terminó la descarga.
+  final String? saveEvent;
+}
+
 /// Protocolo Hidráulico BLE: la caja de manejo del tubo y la guillotina.
 ///
 /// Comparte el perfil GATT de Jaguar, pero agrega al JSON los campos de la caja
-/// (`tomaFuerza`, `rpm`, `errorEcu`) y es el único que procesa la familia de
-/// comandos de descarga (`AT+INICIO`, `AT+DETENER`, `AT+REANUDAR`,
-/// `AT+FINALIZAR`, `AT+MOVIMIENTO`).
+/// (`tomaFuerza`, `rpm`, `errorEcu`, `tubo`, `gillo`) y es el único que procesa
+/// la familia de comandos de descarga (`AT+INICIO`, `AT+DETENER`,
+/// `AT+REANUDAR`, `AT+FINALIZAR`, `AT+MOVIMIENTO`).
 ///
-/// **No usa el motor de simulación automático**: no hay ciclo de fases acá. El
-/// peso queda fijo salvo que el tester lo edite a mano o haya una descarga
-/// activa, y `sensorInduc` nunca cambia — la transición carga/descarga la
-/// maneja la app conectada por comando, no por sensor.
+/// **Tiene dos relojes, y no es casual.** El peso baja con el tick del motor de
+/// simulación, igual que en los demás protocolos. Los actuadores corren con su
+/// propio reloj de 1 s ([advanceActuators]), que sigue andando con la
+/// simulación detenida: en el equipo real el hidráulico no depende de que la
+/// balanza esté pesando.
+///
+/// **No usa el ciclo de fases del motor**: el peso queda fijo salvo que el
+/// tester lo edite a mano o haya una descarga bajando, y `sensorInduc` nunca
+/// cambia — la transición carga/descarga la maneja la app por comando.
 ///
 /// Los métodos que procesan comandos devuelven la línea de log a publicar en
 /// vez de escribirla: así el módulo no necesita conocer al orquestador y se
 /// puede probar solo.
 class HydraulicProtocol implements SimulatorProtocol {
-  HydraulicProtocol();
+  HydraulicProtocol({Random? random})
+      : _guillotina = HydraulicGuillotine(random: random);
 
   @override
   SendProtocol get id => SendProtocol.hidraulicoBle;
@@ -58,13 +79,12 @@ class HydraulicProtocol implements SimulatorProtocol {
   // --- Estado de la corrida: se descarta al salir del modo ---
   ScaleMeasurement _measurement = ScaleMeasurement.baseline;
 
-  /// Posición de cada actuador en pasos discretos (0 cerrado .. 5 abierto):
-  /// cada `AT+MOVIMIENTO` mueve un paso hasta el tope correspondiente.
-  int _tuboPosicion = HydraulicActuatorPosition.closed;
-  int _guillotinaPosicion = HydraulicActuatorPosition.closed;
+  final HydraulicTube _tubo = HydraulicTube();
+  final HydraulicGuillotine _guillotina;
+
+  HydraulicRunPhase _phase = HydraulicRunPhase.idle;
   HydraulicDischargeCommand? _lastInicio;
   HydraulicMovementCommand? _lastMovimiento;
-  bool _dischargeActive = false;
 
   /// `AT+DETENER` pausa la descarga en curso (no la cancela): el peso queda
   /// congelado y los parámetros de la corrida (objetivo, velocidad) se
@@ -73,10 +93,9 @@ class HydraulicProtocol implements SimulatorProtocol {
   bool _justCompleted = false;
 
   /// Evento de guardado prometido por el `AT+INICIO` que inició la corrida en
-  /// curso. Se congela al iniciar la descarga, como el objetivo y la velocidad,
-  /// y no se deduce de [_lastInicio] al completar, porque ese campo también
-  /// guarda los `AT+INICIO` inválidos y los que lleguen mientras la descarga
-  /// baja.
+  /// curso. Se congela al iniciar, como el objetivo y la velocidad, y no se
+  /// deduce de [_lastInicio] al completar, porque ese campo también guarda los
+  /// `AT+INICIO` inválidos y los que lleguen mientras la descarga baja.
   bool _saveAsDosDescargas = false;
   double _currentDisplayedPeso = 0.0;
   double _initialPeso = 0.0;
@@ -87,9 +106,10 @@ class HydraulicProtocol implements SimulatorProtocol {
         tomaFuerza: _tomaFuerza,
         tomaFuerzaRpm: _tomaFuerzaRpm,
         errorEcu: _errorEcu,
-        tuboPosicion: _tuboPosicion,
-        guillotinaPosicion: _guillotinaPosicion,
-        dischargeActive: _dischargeActive,
+        tubo: _tubo.state,
+        tuboProgress: _tubo.progress,
+        gillo: _guillotina.percent,
+        phase: _phase,
         dischargePaused: _dischargePaused,
         initialPeso: _initialPeso,
         targetPeso: _targetPeso,
@@ -97,49 +117,56 @@ class HydraulicProtocol implements SimulatorProtocol {
         lastMovimiento: _lastMovimiento,
       );
 
+  /// Hay algo que animar: el reloj de actuadores tiene que seguir corriendo.
+  bool get needsActuatorClock =>
+      _phase != HydraulicRunPhase.idle ||
+      _tubo.isMoving ||
+      _guillotina.isMoving;
+
   /// Descarta la corrida en curso al salir del modo. La configuración
   /// (`tomaFuerza`, `errorEcu`, rpm) se conserva a propósito: no es estado de
   /// una descarga, es cómo dejó configurada la caja el tester.
   void resetRunState() {
-    _dischargeActive = false;
+    _phase = HydraulicRunPhase.idle;
     _dischargePaused = false;
+    _justCompleted = false;
     _saveAsDosDescargas = false;
     _currentDisplayedPeso = 0.0;
     _initialPeso = 0.0;
     _targetPeso = 0.0;
     _decrementPerTick = 0.0;
-    _tuboPosicion = HydraulicActuatorPosition.closed;
-    _guillotinaPosicion = HydraulicActuatorPosition.closed;
+    _tubo.reset();
+    _guillotina.reset();
   }
 
-  /// Medición vigente. Mientras una descarga corre el peso vive en
+  /// Medición vigente. Mientras la descarga baja el peso vive en
   /// [_currentDisplayedPeso] y no en [_measurement], que sólo se fija al
   /// pausar, finalizar o completar la corrida.
   ScaleMeasurement measurement({required double humidity}) {
     final ScaleMeasurement base = _measurement.copyWith(humedad: humidity);
-    return _dischargeActive
+    return _phase == HydraulicRunPhase.descargando
         ? base.copyWith(peso: _currentDisplayedPeso.round())
         : base;
   }
 
-  /// Peso vigente en la tolva: el de la descarga si hay una corriendo.
-  int get _currentPeso => _dischargeActive
+  /// Peso vigente en la tolva: el de la descarga si hay una bajando.
+  int get _currentPeso => _phase == HydraulicRunPhase.descargando
       ? _currentDisplayedPeso.round()
       : _measurement.peso;
 
-  /// Un tick del motor de simulación. Es lo único que hace bajar el peso
-  /// durante una descarga; con la simulación detenida no hay ticks.
+  /// Un tick del motor de simulación. Es lo único que hace bajar el peso; con
+  /// la simulación detenida no hay ticks y la descarga queda esperando.
   ScaleMeasurement advance({required double humidity}) {
-    // Sólo una descarga en curso y no pausada por AT+DETENER baja el peso en
+    // Sólo una descarga bajando y no pausada por AT+DETENER mueve el peso en
     // este tick: pausada, queda donde estaba y la corrida sigue viva hasta que
     // llegue AT+REANUDAR.
-    if (_dischargeActive && !_dischargePaused) {
+    if (_phase == HydraulicRunPhase.descargando && !_dischargePaused) {
       final double next = _currentDisplayedPeso - _decrementPerTick;
       if (next <= _targetPeso) {
         _currentDisplayedPeso = _targetPeso;
-        _dischargeActive = false;
         _justCompleted = true;
-        _measurement = _measurement.copyWith(peso: _currentDisplayedPeso.round());
+        _measurement =
+            _measurement.copyWith(peso: _currentDisplayedPeso.round());
       } else {
         _currentDisplayedPeso = next;
       }
@@ -147,21 +174,61 @@ class HydraulicProtocol implements SimulatorProtocol {
     return measurement(humidity: humidity);
   }
 
-  /// Evento de guardado que dejó pendiente la descarga que acaba de completar,
-  /// o `null` si no completó ninguna. Se consume una sola vez.
-  ///
-  /// El orquestador lo drena **después** de notificar el payload del tick, para
-  /// que la app vea la tolva en su peso final antes de que le pidan guardar.
-  String? takeCompletedSaveEvent() {
-    if (!_justCompleted) {
-      return null;
+  /// Un paso del reloj de actuadores, que corre aunque la simulación esté
+  /// detenida. Mueve el tubo y la guillotina y hace avanzar el ciclo de la
+  /// corrida.
+  HydraulicActuatorTick advanceActuators(Duration elapsed) {
+    final List<String> logs = <String>[];
+    String? saveEvent;
+
+    _tubo.advance(elapsed);
+    _guillotina.advance(elapsed);
+
+    switch (_phase) {
+      case HydraulicRunPhase.abriendoTubo:
+        // Se pregunta por el estado y no por "llegó en este paso": si el tubo
+        // ya venía abierto de un AT+MOVIMIENTO, no hay recorrido que esperar y
+        // la descarga arranca en el primer paso.
+        if (!_tubo.isMoving && _tubo.isOpen) {
+          _phase = HydraulicRunPhase.descargando;
+          logs.add(
+            'Tubo abierto: arranca la descarga hasta ${_targetPeso.round()} kg',
+          );
+        }
+
+      case HydraulicRunPhase.descargando:
+        if (!_dischargePaused) {
+          final int? nuevoGillo = _guillotina.shuffleDuringDischarge(elapsed);
+          if (nuevoGillo != null) {
+            logs.add('Guillotina regulando: $nuevoGillo%');
+          }
+        }
+        if (_justCompleted) {
+          _justCompleted = false;
+          saveEvent = _saveAsDosDescargas
+              ? HydraulicSaveEvent.guardarDos
+              : HydraulicSaveEvent.guardar;
+          _saveAsDosDescargas = false;
+          _phase = HydraulicRunPhase.cerrandoTubo;
+          _tubo.closeAfterDischarge();
+          _guillotina.close();
+          logs.add(
+            'Descarga completada (peso objetivo alcanzado): enviando '
+            '$saveEvent y cerrando tubo y guillotina',
+          );
+        }
+
+      case HydraulicRunPhase.cerrandoTubo:
+        if (!_tubo.isMoving) {
+          _phase = HydraulicRunPhase.idle;
+          logs.add('Tubo cerrado: corrida terminada');
+        }
+
+      case HydraulicRunPhase.idle:
+        break;
     }
-    _justCompleted = false;
-    final bool dosDescargas = _saveAsDosDescargas;
-    _saveAsDosDescargas = false;
-    return dosDescargas
-        ? HydraulicSaveEvent.guardarDos
-        : HydraulicSaveEvent.guardar;
+
+    return HydraulicActuatorTick(logs: logs, saveEvent: saveEvent);
   }
 
   @override
@@ -171,6 +238,8 @@ class HydraulicProtocol implements SimulatorProtocol {
       tomaFuerza: _tomaFuerza,
       tomaFuerzaRpm: _tomaFuerzaRpm,
       errorEcu: _errorEcu,
+      tubo: _tubo.state,
+      gillo: _guillotina.percent,
     ).toJsonUtf8String();
   }
 
@@ -178,8 +247,8 @@ class HydraulicProtocol implements SimulatorProtocol {
   // Devuelven la línea de log, o null si no hubo cambio que publicar.
 
   String? setPeso(int value) {
-    if (_dischargeActive) {
-      return null; // no se edita a mano mientras hay una descarga en curso
+    if (_phase == HydraulicRunPhase.descargando) {
+      return null; // no se edita a mano mientras la descarga baja
     }
     final int next = value.clamp(0, 22000);
     if (_measurement.peso == next) {
@@ -196,7 +265,8 @@ class HydraulicProtocol implements SimulatorProtocol {
       return null;
     }
     _tomaFuerza = next;
-    final int rpmEnviadas = HydraulicPtoState.isOn(_tomaFuerza) ? _tomaFuerzaRpm : 0;
+    final int rpmEnviadas =
+        HydraulicPtoState.isOn(_tomaFuerza) ? _tomaFuerzaRpm : 0;
     return 'Toma de fuerza configurada: $_tomaFuerza '
         '(rpm enviadas: $rpmEnviadas)';
   }
@@ -246,21 +316,19 @@ class HydraulicProtocol implements SimulatorProtocol {
     _initialPeso = currentPeso.toDouble();
     _targetPeso = (currentPeso - command.kgDescarga).toDouble();
     _decrementPerTick = _rateForVelocidad(command.velocidad);
-    _dischargeActive = true;
     _dischargePaused = false;
+    _justCompleted = false;
     _saveAsDosDescargas = command.isDosDescargas;
 
-    // Al descargar el tubo queda totalmente abierto y la guillotina en alguna
-    // posición que no sea "cerrada": si venía cerrada se la lleva al primer
-    // paso de apertura, si ya estaba abierta se respeta donde la dejaron.
-    _tuboPosicion = HydraulicActuatorPosition.open;
-    if (HydraulicActuatorPosition.isClosed(_guillotinaPosicion)) {
-      _guillotinaPosicion = HydraulicActuatorPosition.firstOpenStep;
-    }
+    // La descarga no arranca acá: primero hay que abrir el tubo. Recién cuando
+    // termina de abrir el peso empieza a bajar.
+    _phase = HydraulicRunPhase.abriendoTubo;
+    _tubo.openForDischarge();
+    _guillotina.openForDischarge();
 
-    return 'AT+INICIO recibido: ${command.summary} -> tubo '
-        '${HydraulicActuatorPosition.label(_tuboPosicion)}, guillotina '
-        '${HydraulicActuatorPosition.label(_guillotinaPosicion)}, cierra con '
+    return 'AT+INICIO recibido: ${command.summary} -> abriendo tubo '
+        '(${HydraulicTube.dischargeTravel.inSeconds}s) y guillotina a '
+        '${HydraulicGuillotine.dischargeOpenPercent}%, cierra con '
         '${_saveAsDosDescargas ? HydraulicSaveEvent.guardarDos : HydraulicSaveEvent.guardar}';
   }
 
@@ -270,7 +338,7 @@ class HydraulicProtocol implements SimulatorProtocol {
   /// porque todavía no se alcanzó el objetivo. La descarga retoma desde ese
   /// mismo peso al recibir `AT+REANUDAR`.
   String applyDetener() {
-    if (!_dischargeActive) {
+    if (_phase != HydraulicRunPhase.descargando) {
       return 'AT+DETENER recibido: no hay descarga en curso';
     }
     if (_dischargePaused) {
@@ -278,7 +346,7 @@ class HydraulicProtocol implements SimulatorProtocol {
     }
 
     _dischargePaused = true;
-    // Mientras la descarga corre el peso vive en _currentDisplayedPeso: hay que
+    // Mientras la descarga baja el peso vive en _currentDisplayedPeso: hay que
     // fijarlo en la medición del modo o el próximo tick volvería al peso previo
     // al AT+INICIO.
     _measurement = _measurement.copyWith(peso: _currentDisplayedPeso.round());
@@ -292,7 +360,7 @@ class HydraulicProtocol implements SimulatorProtocol {
   /// velocidad del `AT+INICIO` original, y al llegar al objetivo dispara
   /// `AT+GUARDAR` como cualquier descarga completa.
   String applyReanudar() {
-    if (!_dischargeActive) {
+    if (_phase != HydraulicRunPhase.descargando) {
       return 'AT+REANUDAR recibido: no hay descarga pausada';
     }
     if (!_dischargePaused) {
@@ -306,62 +374,66 @@ class HydraulicProtocol implements SimulatorProtocol {
   }
 
   /// `AT+FINALIZAR` termina la descarga automática sin haber llegado al
-  /// objetivo: el peso queda donde estaba en ese momento y la corrida se
-  /// descarta (no queda nada para reanudar). Sirve tanto con la descarga
-  /// corriendo como pausada por `AT+DETENER`. No se envía `AT+GUARDAR`, porque
-  /// el guardado lo decide la app que finalizó. Los actuadores quedan en la
-  /// posición en la que estaban y vuelven a responder a `AT+MOVIMIENTO`.
+  /// objetivo: el peso queda donde estaba y la corrida se descarta. No se envía
+  /// `AT+GUARDAR`, porque el guardado lo decide la app que finalizó.
+  ///
+  /// **El tubo queda como está** —si venía abriéndose, termina de abrir— pero
+  /// la guillotina sí se cierra: es la que corta el caudal.
   String applyFinalizar() {
-    if (!_dischargeActive) {
+    if (_phase == HydraulicRunPhase.idle ||
+        _phase == HydraulicRunPhase.cerrandoTubo) {
       return 'AT+FINALIZAR recibido: no hay descarga en curso';
     }
 
     final bool estabaPausada = _dischargePaused;
-    _dischargeActive = false;
+    _phase = HydraulicRunPhase.idle;
     _dischargePaused = false;
     _justCompleted = false;
     // La corrida se descarta entera: su evento de guardado no puede quedar
     // pegado para el próximo AT+INICIO.
     _saveAsDosDescargas = false;
-    // Mientras la descarga corre el peso vive en _currentDisplayedPeso: hay que
+    // Mientras la descarga baja el peso vive en _currentDisplayedPeso: hay que
     // fijarlo en la medición del modo o el próximo tick volvería al peso previo
     // al AT+INICIO.
     _measurement = _measurement.copyWith(peso: _currentDisplayedPeso.round());
+    _guillotina.close();
 
-    return 'AT+FINALIZAR recibido: descarga automática terminada en '
-        '${_measurement.peso} kg (objetivo ${_targetPeso.round()} kg'
-        '${estabaPausada ? ', estaba pausada' : ''}), no se envía AT+GUARDAR';
+    return 'AT+FINALIZAR recibido: descarga terminada en ${_measurement.peso} '
+        'kg (objetivo ${_targetPeso.round()} kg'
+        '${estabaPausada ? ', estaba pausada' : ''}), cerrando guillotina, '
+        'el tubo queda como está, no se envía AT+GUARDAR';
   }
 
+  /// `AT+MOVIMIENTO` mueve un actuador a mano. El recorrido completo tarda
+  /// [HydraulicTube.manualTravel]; invertir la marcha a mitad de camino
+  /// arranca desde donde quedó, no desde el tope.
   String applyMovimiento(HydraulicMovementCommand command) {
     _lastMovimiento = command;
 
-    // Durante una descarga las posiciones las maneja la descarga misma: los
-    // abrir/cerrar de tubo y guillotina se ignoran hasta que termine. Una
-    // descarga pausada por AT+DETENER sigue siendo una descarga en curso.
-    if (_dischargeActive) {
+    // Durante una corrida los actuadores los maneja el ciclo de descarga: los
+    // abrir/cerrar se ignoran hasta que termine. Una descarga pausada por
+    // AT+DETENER sigue siendo una corrida en curso.
+    if (_phase != HydraulicRunPhase.idle) {
       return 'AT+MOVIMIENTO recibido: ${command.label} (tipo=${command.tipo}) '
           '-> ignorado, hay una descarga en curso'
           '${_dischargePaused ? ' (pausada)' : ''}';
     }
 
     final bool? opens = command.opens;
-    if (opens != null && command.affectsTube) {
-      _tuboPosicion =
-          HydraulicActuatorPosition.stepped(_tuboPosicion, opening: opens);
-      return 'AT+MOVIMIENTO recibido: ${command.label} (tipo=${command.tipo}) '
-          '-> tubo en ${HydraulicActuatorPosition.label(_tuboPosicion)}';
+    if (opens == null) {
+      return 'AT+MOVIMIENTO recibido: ${command.label} (tipo=${command.tipo})';
     }
-    if (opens != null && command.affectsGuillotine) {
-      _guillotinaPosicion = HydraulicActuatorPosition.stepped(
-        _guillotinaPosicion,
-        opening: opens,
-      );
+
+    final int segundos = HydraulicTube.manualTravel.inSeconds;
+    if (command.affectsTube) {
+      _tubo.moveManually(opening: opens);
       return 'AT+MOVIMIENTO recibido: ${command.label} (tipo=${command.tipo}) '
-          '-> guillotina en '
-          '${HydraulicActuatorPosition.label(_guillotinaPosicion)}';
+          '-> tubo ${TubeState.label(_tubo.state)} (recorrido ${segundos}s)';
     }
-    return 'AT+MOVIMIENTO recibido: ${command.label} (tipo=${command.tipo})';
+    _guillotina.moveManually(opening: opens);
+    return 'AT+MOVIMIENTO recibido: ${command.label} (tipo=${command.tipo}) '
+        '-> guillotina ${opens ? 'abriendo' : 'cerrando'} desde '
+        '${_guillotina.percent}% (recorrido ${segundos}s)';
   }
 
   double _rateForVelocidad(int velocidad) {

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_actuator_position.dart';
+import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_actuators.dart';
 import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_discharge_command.dart';
 import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_movement_command.dart';
 import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_pto.dart';
@@ -78,9 +78,10 @@ class HydraulicView extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             _HydraulicDiagramCard(
-              tuboPosicion: state.hidraulico.tuboPosicion,
-              guillotinaPosicion: state.hidraulico.guillotinaPosicion,
-              dischargeActive: state.hidraulico.dischargeActive,
+              tubo: state.hidraulico.tubo,
+              tuboProgress: state.hidraulico.tuboProgress,
+              gillo: state.hidraulico.gillo,
+              runActive: state.hidraulico.runActive,
               dischargePaused: state.hidraulico.dischargePaused,
             ),
             const SizedBox(height: 4),
@@ -182,15 +183,17 @@ class HydraulicView extends StatelessWidget {
 
 class _HydraulicDiagramCard extends StatelessWidget {
   const _HydraulicDiagramCard({
-    required this.tuboPosicion,
-    required this.guillotinaPosicion,
-    required this.dischargeActive,
+    required this.tubo,
+    required this.tuboProgress,
+    required this.gillo,
+    required this.runActive,
     required this.dischargePaused,
   });
 
-  final int tuboPosicion;
-  final int guillotinaPosicion;
-  final bool dischargeActive;
+  final int tubo;
+  final double tuboProgress;
+  final int gillo;
+  final bool runActive;
   final bool dischargePaused;
 
   @override
@@ -200,22 +203,41 @@ class _HydraulicDiagramCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          _ActuatorPositionBar(
+          _ActuatorBar(
             label: 'Tubo',
             icon: Icons.horizontal_rule_rounded,
-            position: tuboPosicion,
+            // El JSON manda el estado, no el recorrido: el equipo real sólo
+            // tiene sensores de fin de carrera. La barra es ayuda visual del
+            // simulador.
+            fraction: tuboProgress,
+            emptyLabel: 'Cerrado',
+            filledLabel: 'Abierto',
+            value: TubeState.label(tubo),
+            moving: tubo == TubeState.abriendo || tubo == TubeState.cerrando,
+            atClosedEnd: tubo == TubeState.cerrado,
+            atOpenEnd: tubo == TubeState.abierto,
           ),
           const SizedBox(height: 14),
-          _ActuatorPositionBar(
+          _ActuatorBar(
             label: 'Guillotina',
             icon: Icons.vertical_align_bottom_rounded,
-            position: guillotinaPosicion,
+            // Acá la barra es la hoja de la guillotina, no la abertura: llena
+            // quiere decir tapada. Por eso se invierte respecto de `gillo`,
+            // que es la abertura (0 cerrada, 100 abierta) y es lo que viaja en
+            // el JSON.
+            fraction: 1.0 - gillo / 100.0,
+            emptyLabel: 'Abierta',
+            filledLabel: 'Cerrada',
+            value: '$gillo%',
+            moving: false,
+            atClosedEnd: gillo == 0,
+            atOpenEnd: gillo == 100,
           ),
           const SizedBox(height: 10),
           Row(
             children: <Widget>[
               Icon(
-                dischargeActive
+                runActive
                     ? (dischargePaused
                         ? Icons.pause_circle_outline_rounded
                         : Icons.lock_rounded)
@@ -226,16 +248,17 @@ class _HydraulicDiagramCard extends StatelessWidget {
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  dischargeActive
+                  runActive
                       ? (dischargePaused
                           ? 'Descarga pausada por AT+DETENER: los '
                               'AT+MOVIMIENTO siguen ignorándose hasta '
                               'AT+REANUDAR'
-                          : 'Descarga en curso: los AT+MOVIMIENTO de '
+                          : 'Corrida en curso: los AT+MOVIMIENTO de '
                               'abrir/cerrar se ignoran')
-                      : 'Cada AT+MOVIMIENTO mueve un paso '
-                          '(${HydraulicActuatorPosition.steps} pasos entre '
-                          'cerrado y abierto)',
+                      : 'Cada AT+MOVIMIENTO recorre el actuador entero en '
+                          '${HydraulicTube.manualTravel.inSeconds} s; '
+                          'invertir a mitad de camino arranca desde donde '
+                          'quedó',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: const Color(0xFF3A5E56),
                       ),
@@ -249,18 +272,34 @@ class _HydraulicDiagramCard extends StatelessWidget {
   }
 }
 
-/// Barra gruesa que muestra en qué paso quedó el actuador entre los topes
-/// "cerrado" y "abierto".
-class _ActuatorPositionBar extends StatelessWidget {
-  const _ActuatorPositionBar({
+/// Barra que dibuja la posición de un actuador.
+///
+/// Qué significa el relleno lo decide quien la usa, porque no es lo mismo en
+/// los dos: en el tubo la barra es la abertura (llena = abierto) y en la
+/// guillotina es la hoja (llena = cerrada). [emptyLabel] y [filledLabel]
+/// nombran los dos extremos para que no haya que adivinarlo.
+class _ActuatorBar extends StatelessWidget {
+  const _ActuatorBar({
     required this.label,
     required this.icon,
-    required this.position,
+    required this.fraction,
+    required this.emptyLabel,
+    required this.filledLabel,
+    required this.value,
+    required this.moving,
+    required this.atClosedEnd,
+    required this.atOpenEnd,
   });
 
   final String label;
   final IconData icon;
-  final int position;
+  final double fraction;
+  final String emptyLabel;
+  final String filledLabel;
+  final String value;
+  final bool moving;
+  final bool atClosedEnd;
+  final bool atOpenEnd;
 
   static const Color _closedColor = Color(0xFFB3261E);
   static const Color _partialColor = Color(0xFFB26A00);
@@ -268,11 +307,12 @@ class _ActuatorPositionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final int step = HydraulicActuatorPosition.clamp(position);
     final Color color;
-    if (HydraulicActuatorPosition.isClosed(step)) {
+    if (moving) {
+      color = _partialColor;
+    } else if (atClosedEnd) {
       color = _closedColor;
-    } else if (HydraulicActuatorPosition.isFullyOpen(step)) {
+    } else if (atOpenEnd) {
       color = _openColor;
     } else {
       color = _partialColor;
@@ -288,8 +328,7 @@ class _ActuatorPositionBar extends StatelessWidget {
             Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
             const Spacer(),
             Text(
-              '${HydraulicActuatorPosition.label(step)} '
-              '($step/${HydraulicActuatorPosition.steps})',
+              value,
               style: TextStyle(color: color, fontWeight: FontWeight.w800),
             ),
           ],
@@ -303,26 +342,17 @@ class _ActuatorPositionBar extends StatelessWidget {
             border: Border.all(color: color.withValues(alpha: 0.55), width: 1.4),
           ),
           clipBehavior: Clip.antiAlias,
-          child: Stack(
-            children: <Widget>[
-              Positioned.fill(
-                child: TweenAnimationBuilder<double>(
-                  duration: const Duration(milliseconds: 280),
-                  curve: Curves.easeOut,
-                  tween: Tween<double>(
-                    end: HydraulicActuatorPosition.fraction(step),
-                  ),
-                  builder: (BuildContext context, double value, Widget? _) {
-                    return FractionallySizedBox(
-                      alignment: Alignment.centerLeft,
-                      widthFactor: value,
-                      child: ColoredBox(color: color),
-                    );
-                  },
-                ),
-              ),
-              Positioned.fill(child: _StepTicks(filledSteps: step)),
-            ],
+          child: TweenAnimationBuilder<double>(
+            duration: const Duration(milliseconds: 280),
+            curve: Curves.easeOut,
+            tween: Tween<double>(end: fraction.clamp(0.0, 1.0)),
+            builder: (BuildContext context, double animated, Widget? _) {
+              return FractionallySizedBox(
+                alignment: Alignment.centerLeft,
+                widthFactor: animated,
+                child: ColoredBox(color: color),
+              );
+            },
           ),
         ),
         const SizedBox(height: 4),
@@ -330,13 +360,13 @@ class _ActuatorPositionBar extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: <Widget>[
             Text(
-              'Cerrado',
+              emptyLabel,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: const Color(0xFF3A5E56),
                   ),
             ),
             Text(
-              'Abierto',
+              filledLabel,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: const Color(0xFF3A5E56),
                   ),
@@ -344,44 +374,6 @@ class _ActuatorPositionBar extends StatelessWidget {
           ],
         ),
       ],
-    );
-  }
-}
-
-/// Divisiones internas de la barra: una por cada paso intermedio. Las que
-/// caen sobre la parte ya recorrida se dibujan claras y el resto oscuras,
-/// para que se lean sobre el relleno y sobre el fondo.
-class _StepTicks extends StatelessWidget {
-  const _StepTicks({required this.filledSteps});
-
-  final int filledSteps;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: List<Widget>.generate(
-        HydraulicActuatorPosition.steps,
-        (int index) {
-          final bool isLast = index == HydraulicActuatorPosition.steps - 1;
-          final bool overFill = index + 1 <= filledSteps;
-          return Expanded(
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: isLast
-                  ? const SizedBox.shrink()
-                  : SizedBox(
-                      width: 1.5,
-                      height: double.infinity,
-                      child: ColoredBox(
-                        color: overFill
-                            ? Colors.white.withValues(alpha: 0.75)
-                            : const Color(0xFF0B3D35).withValues(alpha: 0.22),
-                      ),
-                    ),
-            ),
-          );
-        },
-      ),
     );
   }
 }

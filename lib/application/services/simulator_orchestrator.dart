@@ -21,10 +21,15 @@ class SimulatorOrchestrator {
   SimulatorOrchestrator({
     required BlePeripheralRepository bleRepository,
     required ScaleSimulationRepository simulationRepository,
+    this.actuatorTickInterval = const Duration(seconds: 1),
   })  : _bleRepository = bleRepository,
         _simulationRepository = simulationRepository {
     _bindSources();
   }
+
+  /// Cada cuánto avanzan el tubo y la guillotina del modo Hidráulico. Se puede
+  /// bajar en los tests para no esperar los 6 o 15 segundos reales.
+  final Duration actuatorTickInterval;
 
   final BlePeripheralRepository _bleRepository;
   final ScaleSimulationRepository _simulationRepository;
@@ -121,6 +126,7 @@ class SimulatorOrchestrator {
     ));
     _pushLog('Protocolo seleccionado: ${protocol.label}');
     await _sendCurrentPayloadNow();
+    _syncActuatorTicker();
   }
 
   // La configuración del modo Hidráulico vive en su módulo; acá sólo se
@@ -219,6 +225,8 @@ class SimulatorOrchestrator {
   }
 
   Future<void> dispose() async {
+    _actuatorTicker?.cancel();
+    _actuatorTicker = null;
     await _subscriptions.cancelAll();
     await _simulationRepository.dispose();
     await _bleRepository.dispose();
@@ -277,24 +285,63 @@ class SimulatorOrchestrator {
                   : _automatisms.holdSecondsRemaining,
         );
 
-        // Se drena DESPUÉS de notificar el payload del tick, para que la app
-        // vea la tolva en su peso final antes de que le pidan guardar. El
-        // módulo lo entrega una sola vez, así que un AT+INICIO que se
-        // intercale no puede pisar el evento de la corrida que está cerrando.
-        final String? saveEvent = _hydraulic.takeCompletedSaveEvent();
-        if (saveEvent != null) {
-          final bool dosDescargas =
-              saveEvent == HydraulicSaveEvent.guardarDos;
-          _pushLog(
-            'Descarga hidráulica completada (peso objetivo alcanzado): '
-            'enviando $saveEvent'
-            '${dosDescargas ? ' (modo dos descargas: la app debe mandar un '
-                'segundo AT+INICIO en modo 1)' : ''}',
-          );
-          await _sendSaveEvent(saveEvent);
-        }
       }),
     );
+  }
+
+  // --- Reloj de actuadores del modo Hidráulico ---
+  //
+  // Es un segundo reloj, aparte del tick del motor de simulación, y corre
+  // aunque la simulación esté detenida: el tubo y la guillotina de un equipo
+  // real se mueven sin depender de que la balanza esté pesando. Sólo está vivo
+  // mientras haya algo que animar.
+
+  Timer? _actuatorTicker;
+
+  void _syncActuatorTicker() {
+    final bool needed = _sendProtocol == SendProtocol.hidraulicoBle &&
+        _hydraulic.needsActuatorClock;
+
+    if (needed && _actuatorTicker == null) {
+      _actuatorTicker = Timer.periodic(
+        actuatorTickInterval,
+        (_) => unawaited(tickActuators()),
+      );
+    } else if (!needed && _actuatorTicker != null) {
+      _actuatorTicker!.cancel();
+      _actuatorTicker = null;
+    }
+  }
+
+  /// Avanza el tubo y la guillotina un paso de [actuatorTickInterval], publica
+  /// lo que haya que loguear y notifica el payload.
+  ///
+  /// Normalmente lo llama el timer interno una vez por segundo; los tests lo
+  /// llaman directo para no esperar los 6 o 15 segundos del recorrido.
+  Future<void> tickActuators() async {
+    final HydraulicActuatorTick tick =
+        _hydraulic.advanceActuators(actuatorTickInterval);
+
+    for (final String line in tick.logs) {
+      _pushLog(line);
+    }
+
+    // El payload sale primero para que la app vea la tolva en su peso final
+    // antes de que le pidan guardar.
+    await _sendCurrentPayloadNow();
+
+    final String? saveEvent = tick.saveEvent;
+    if (saveEvent != null) {
+      if (saveEvent == HydraulicSaveEvent.guardarDos) {
+        _pushLog(
+          'Modo dos descargas: la app debe mandar un segundo AT+INICIO en '
+          'modo 1',
+        );
+      }
+      await _sendSaveEvent(saveEvent);
+    }
+
+    _syncActuatorTicker();
   }
 
 
@@ -498,6 +545,9 @@ class SimulatorOrchestrator {
   Future<void> _applyHydraulicCommand(String log) async {
     _pushLog(log);
     await _sendCurrentPayloadNow();
+    // Un AT+INICIO o un AT+MOVIMIENTO pueden dejar actuadores en movimiento, y
+    // un AT+FINALIZAR puede dejar de necesitar el reloj.
+    _syncActuatorTicker();
   }
 
 
