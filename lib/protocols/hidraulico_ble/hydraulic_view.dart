@@ -210,6 +210,8 @@ class _HydraulicDiagramCard extends StatelessWidget {
             // tiene sensores de fin de carrera. La barra es ayuda visual del
             // simulador.
             fraction: tuboProgress,
+            emptyLabel: 'Cerrado',
+            filledLabel: 'Abierto',
             value: TubeState.label(tubo),
             moving: tubo == TubeState.abriendo || tubo == TubeState.cerrando,
             atClosedEnd: tubo == TubeState.cerrado,
@@ -219,7 +221,13 @@ class _HydraulicDiagramCard extends StatelessWidget {
           _ActuatorBar(
             label: 'Guillotina',
             icon: Icons.vertical_align_bottom_rounded,
-            fraction: gillo / 100.0,
+            // Acá la barra es la hoja de la guillotina, no la abertura: llena
+            // quiere decir tapada. Por eso se invierte respecto de `gillo`,
+            // que es la abertura (0 cerrada, 100 abierta) y es lo que viaja en
+            // el JSON.
+            fraction: 1.0 - gillo / 100.0,
+            emptyLabel: 'Abierta',
+            filledLabel: 'Cerrada',
             value: '$gillo%',
             moving: false,
             atClosedEnd: gillo == 0,
@@ -264,12 +272,19 @@ class _HydraulicDiagramCard extends StatelessWidget {
   }
 }
 
-/// Barra que muestra cuánto abierto está un actuador.
+/// Barra que dibuja la posición de un actuador.
+///
+/// Qué significa el relleno lo decide quien la usa, porque no es lo mismo en
+/// los dos: en el tubo la barra es la abertura (llena = abierto) y en la
+/// guillotina es la hoja (llena = cerrada). [emptyLabel] y [filledLabel]
+/// nombran los dos extremos para que no haya que adivinarlo.
 class _ActuatorBar extends StatelessWidget {
   const _ActuatorBar({
     required this.label,
     required this.icon,
     required this.fraction,
+    required this.emptyLabel,
+    required this.filledLabel,
     required this.value,
     required this.moving,
     required this.atClosedEnd,
@@ -279,6 +294,8 @@ class _ActuatorBar extends StatelessWidget {
   final String label;
   final IconData icon;
   final double fraction;
+  final String emptyLabel;
+  final String filledLabel;
   final String value;
   final bool moving;
   final bool atClosedEnd;
@@ -343,13 +360,13 @@ class _ActuatorBar extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: <Widget>[
             Text(
-              'Cerrado',
+              emptyLabel,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: const Color(0xFF3A5E56),
                   ),
             ),
             Text(
-              'Abierto',
+              filledLabel,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: const Color(0xFF3A5E56),
                   ),
