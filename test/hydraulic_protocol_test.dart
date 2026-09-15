@@ -180,6 +180,40 @@ void main() {
     });
   });
 
+  group('convención de gillo', () {
+    final HydraulicMovementCommand abrirGuillotina =
+        HydraulicMovementCommand.tryParse('AT+MOVIMIENTO=3')!;
+    final HydraulicMovementCommand cerrarGuillotina =
+        HydraulicMovementCommand.tryParse('AT+MOVIMIENTO=4')!;
+
+    test('0 es totalmente cerrada y 100 totalmente abierta', () {
+      final HydraulicProtocol p = conPeso(1000);
+
+      // Arranca cerrada.
+      expect(p.state.gillo, 0);
+
+      // Abrir del todo la lleva a 100, no al revés.
+      p.applyMovimiento(abrirGuillotina);
+      correrActuadores(p, HydraulicGuillotine.travel.inSeconds);
+      expect(p.state.gillo, 100);
+
+      // Y cerrar la trae de vuelta a 0.
+      p.applyMovimiento(cerrarGuillotina);
+      correrActuadores(p, HydraulicGuillotine.travel.inSeconds);
+      expect(p.state.gillo, 0);
+    });
+
+    test('abrir a medias da un valor intermedio, no su complemento', () {
+      final HydraulicProtocol p = conPeso(1000);
+
+      p.applyMovimiento(abrirGuillotina);
+      // Un tercio del recorrido de 15 s.
+      correrActuadores(p, 5);
+
+      expect(p.state.gillo, closeTo(33, 1));
+    });
+  });
+
   group('AT+MOVIMIENTO manual', () {
     final HydraulicMovementCommand abrirTubo =
         HydraulicMovementCommand.tryParse('AT+MOVIMIENTO=1')!;
