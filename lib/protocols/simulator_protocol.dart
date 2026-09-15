@@ -1,4 +1,5 @@
 import 'package:test_jaguar/core/constants/ble_constants.dart';
+import 'package:test_jaguar/domain/entities/scale_measurement.dart';
 import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
 import 'package:test_jaguar/protocols/payload_framing.dart';
 
@@ -23,4 +24,11 @@ abstract class SimulatorProtocol {
 
   /// Cómo enmarcar el payload en el aire.
   PayloadFraming get framing;
+
+  /// La trama que viaja por notify para [measurement].
+  ///
+  /// Es lo único que los cuatro protocolos hacen de forma realmente
+  /// polimórfica: tres arman JSON (con distintos campos) y el ST407 arma una
+  /// cadena separada por coma.
+  String encodePayload(ScaleMeasurement measurement);
 }

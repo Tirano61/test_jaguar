@@ -123,6 +123,7 @@ class St407RemoteProtocol implements SimulatorProtocol {
   /// los contadores si hicieran falta. Es el comportamiento original y hay un
   /// test que lo fija (`AT+CERO` en mezclado roba un segundo justamente porque
   /// dispara un envío extra).
+  @override
   String encodePayload(ScaleMeasurement measurement) {
     if (isLoadingScreen) {
       _ensureLoadingSeeded(measurement.peso);

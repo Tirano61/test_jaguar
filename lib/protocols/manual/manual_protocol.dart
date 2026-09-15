@@ -39,6 +39,7 @@ class ManualProtocol implements SimulatorProtocol {
     _measurement = _normalize(measurement);
   }
 
+  @override
   String encodePayload(ScaleMeasurement measurement) =>
       ScalePayloadDto(measurement: measurement).toJsonUtf8String();
 

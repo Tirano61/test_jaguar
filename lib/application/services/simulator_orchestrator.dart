@@ -13,7 +13,7 @@ import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_protocol.dart';
 import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_state.dart';
 import 'package:test_jaguar/protocols/manual/manual_protocol.dart';
 import 'package:test_jaguar/protocols/protocol_registry.dart';
-import 'package:test_jaguar/protocols/shared/scale_payload.dart';
+import 'package:test_jaguar/protocols/shared/scale_automatisms.dart';
 import 'package:test_jaguar/protocols/simulator_protocol.dart';
 import 'package:test_jaguar/protocols/st407_remote/st407_remote_protocol.dart';
 import 'package:test_jaguar/protocols/st407_remote/st407_screen.dart';
@@ -51,13 +51,18 @@ class SimulatorOrchestrator {
   St407RemoteProtocol get _st407 =>
       _registry.of(SendProtocol.st407Remote) as St407RemoteProtocol;
 
+  /// Congelado de peso y estabilidad. Una sola instancia compartida: el peso
+  /// que congela sale del último emitido globalmente, no del protocolo activo.
+  final ScaleAutomatisms _automatisms = ScaleAutomatisms(
+    sensorInduc: SimulatorStatusDto.initial.measurement.sensorInduc,
+  );
+
   final StreamController<SimulatorStatusDto> _statusController =
       StreamController<SimulatorStatusDto>.broadcast();
 
   final List<StreamSubscription<dynamic>> _subscriptions =
       <StreamSubscription<dynamic>>[];
 
-  static const int _weightHoldTicksAfterSensorChange = 5;
   static const String _resetHoldCommand = 'AT+RSTHOLD';
   static const String _toggleTareCommand = 'AT+TARA';
   static const String _zeroWeightCommand = 'AT+CERO';
@@ -67,9 +72,6 @@ class SimulatorOrchestrator {
 
   SendProtocol _sendProtocol = SendProtocol.jaguarBle;
   double _selectedHumidity = 10.0;
-  int _lastSensorInduc = SimulatorStatusDto.initial.measurement.sensorInduc;
-  int _weightHoldTicksRemaining = 0;
-  int? _heldWeight;
   SimulatorStatusDto _current = SimulatorStatusDto.initial;
 
   int _lastProcessedCommandSequence = -1;
@@ -96,9 +98,7 @@ class SimulatorOrchestrator {
     }
     _sendProtocol = protocol;
     await _bleRepository.updateBleUuids(_protocol.bleUuids);
-    _weightHoldTicksRemaining = 0;
-    _heldWeight = null;
-    _lastSensorInduc = _current.measurement.sensorInduc;
+    _automatisms.reset(sensorInduc: _current.measurement.sensorInduc);
 
     // Limpiar estado ST407 si ya no estamos en ese protocolo
     if (_sendProtocol != SendProtocol.st407Remote) {
@@ -271,7 +271,7 @@ class SimulatorOrchestrator {
           weightHoldSecondsRemaining:
               _sendProtocol == SendProtocol.manual
                   ? 0
-                  : _weightHoldTicksRemaining,
+                  : _automatisms.holdSecondsRemaining,
         );
 
         // Se drena DESPUÉS de notificar el payload del tick, para que la app
@@ -311,7 +311,7 @@ class SimulatorOrchestrator {
     await _notifyAndEmitMeasurement(
       measurement,
       weightHoldSecondsRemaining:
-          _sendProtocol == SendProtocol.manual ? 0 : _weightHoldTicksRemaining,
+          _sendProtocol == SendProtocol.manual ? 0 : _automatisms.holdSecondsRemaining,
     );
   }
 
@@ -319,7 +319,7 @@ class SimulatorOrchestrator {
     ScaleMeasurement measurement, {
     required int weightHoldSecondsRemaining,
   }) async {
-    final String payload = _payloadForCurrentProtocol(measurement);
+    final String payload = _protocol.encodePayload(measurement);
     try {
       await _bleRepository.notifyUtf8Json(payload);
     } catch (error) {
@@ -362,76 +362,42 @@ class SimulatorOrchestrator {
     );
   }
 
-  String _payloadForCurrentProtocol(ScaleMeasurement measurement) {
-    if (_sendProtocol == SendProtocol.hidraulicoBle) {
-      return _hydraulic.encodePayload(measurement);
-    }
+  // El armado de la trama ya no se pregunta por el protocolo: lo hace cada
+  // módulo. Ver `_protocol.encodePayload` en `_notifyAndEmitMeasurement`.
 
-    if (_sendProtocol == SendProtocol.st407Remote) {
-      return _st407.encodePayload(measurement);
-    }
-
-    return ScalePayloadDto(measurement: measurement).toJsonUtf8String();
-  }
-
-  ScaleMeasurement _measurementForCurrentProtocol(ScaleMeasurement measurement) {
+  /// De dónde sale el peso en cada modo. Es la única tabla de despacho por
+  /// protocolo que queda: cada rama delega en un módulo.
+  ScaleMeasurement _measurementForCurrentProtocol(ScaleMeasurement engine) {
+    // Manual ignora el motor: manda lo que el tester dejó en los sliders.
     if (_sendProtocol == SendProtocol.manual) {
       return _manual.measurement;
     }
 
-    // Hidráulico BLE no usa el motor de simulación automático (measurement,
-    // el tick de fases carga/descarga): el peso queda fijo salvo que el
-    // tester lo edite a mano o haya una descarga activa por AT+INICIO, y
-    // sensorInduc nunca cambia (la app conectada maneja la transición
-    // carga/descarga por comando, no por sensor).
+    // Hidráulico tampoco usa el ciclo de fases: el peso sólo se mueve si hay
+    // una descarga en curso, y el tick es su reloj.
     if (_sendProtocol == SendProtocol.hidraulicoBle) {
-      // Sólo una descarga en curso y no pausada por AT+DETENER baja el peso
-      // en este tick: pausada, queda donde estaba y la corrida sigue viva
       return _hydraulic.advance(humidity: _selectedHumidity);
     }
 
-    ScaleMeasurement base = measurement.copyWith(humedad: _selectedHumidity);
+    final ScaleMeasurement base = engine.copyWith(humedad: _selectedHumidity);
 
-    // En las pantallas de carga el peso lo anima el propio protocolo, asi
-    // que el que trae el motor se ignora.
+    // En las pantallas de carga del ST407 el peso lo anima el protocolo.
     if (_sendProtocol == SendProtocol.st407Remote && _st407.isLoadingScreen) {
       return _st407.advanceLoading(base);
     }
 
-    return _withScaleStateFromWeightChange(_withWeightHoldAfterSensorChange(base));
+    // Jaguar, y el ST407 fuera de las pantallas de carga: peso del motor con
+    // los automatismos de balanza encima.
+    return _automatisms.apply(
+      base,
+      lastEmitted: _current.measurement,
+      log: _pushLog,
+    );
   }
 
   double _normalizeHumidity(double value) {
     final double clamped = value.clamp(0.0, 22.0);
     return double.parse(clamped.toStringAsFixed(1));
-  }
-
-  ScaleMeasurement _withWeightHoldAfterSensorChange(
-    ScaleMeasurement measurement,
-  ) {
-    final int previousSensorInduc = _lastSensorInduc;
-    if (measurement.sensorInduc != previousSensorInduc) {
-      _lastSensorInduc = measurement.sensorInduc;
-      _weightHoldTicksRemaining = _weightHoldTicksAfterSensorChange;
-      _heldWeight = _current.measurement.peso;
-      _pushLog(
-        'Cambio sensorInduc $previousSensorInduc -> ${measurement.sensorInduc}: peso congelado 5s',
-      );
-    }
-
-    if (_weightHoldTicksRemaining > 0 && _heldWeight != null) {
-      _weightHoldTicksRemaining -= 1;
-      return measurement.copyWith(peso: _heldWeight);
-    }
-
-    return measurement;
-  }
-
-  ScaleMeasurement _withScaleStateFromWeightChange(
-    ScaleMeasurement measurement,
-  ) {
-    final bool weightChanged = measurement.peso != _current.measurement.peso;
-    return measurement.copyWith(estBalanza: weightChanged ? 0 : 1);
   }
 
   Future<void> _applyIncomingCommandIfNeeded(String? command) async {
@@ -477,7 +443,7 @@ class SimulatorOrchestrator {
       _pushLog('Comando aplicado: AT+CERO -> peso=0 (jaguar)');
       await _notifyAndEmitMeasurement(
         zeroedMeasurement,
-        weightHoldSecondsRemaining: _weightHoldTicksRemaining,
+        weightHoldSecondsRemaining: _automatisms.holdSecondsRemaining,
       );
       return;
     }
