@@ -158,18 +158,11 @@ class SimulatorController extends ChangeNotifier {
         lastReceivedCommand: status.bleStatus.lastReceivedCommand,
         running: status.running,
         sendProtocol: status.sendProtocol,
-        serviceUuid: status.sendProtocol == SendProtocol.st407Remote
-          ? BleConstants.remotoAbf3.serviceUuid
-          : BleConstants.jaguar.serviceUuid,
-        characteristicUuid: status.sendProtocol == SendProtocol.st407Remote
-          ? BleConstants.remotoAbf3.notifyUuid
-          : BleConstants.jaguar.notifyUuid,
-        serviceWriteUuid: status.sendProtocol == SendProtocol.st407Remote
-          ? BleConstants.remotoAbf3.writeServiceUuid
-          : BleConstants.jaguar.writeServiceUuid,
-        characteristicWriteUuid: status.sendProtocol == SendProtocol.st407Remote
-          ? BleConstants.remotoAbf3.writeUuid
-          : BleConstants.jaguar.writeUuid,
+        // El perfil lo decide el protocolo activo; acá sólo se muestra.
+        serviceUuid: status.bleUuids.serviceUuid,
+        characteristicUuid: status.bleUuids.notifyUuid,
+        serviceWriteUuid: status.bleUuids.writeServiceUuid,
+        characteristicWriteUuid: status.bleUuids.writeUuid,
         st407Screen: status.st407Screen,
         phaseName: status.phase.label,
         weight: status.measurement.peso,
