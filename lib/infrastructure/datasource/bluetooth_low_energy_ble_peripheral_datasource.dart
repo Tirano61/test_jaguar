@@ -52,7 +52,6 @@ class BluetoothLowEnergyBlePeripheralDataSource
   BleUuids _activeUuids = BleConstants.jaguar;
   int _packetId = 0;
   int _commandSequence = 0;
-  static const bool _kRunSt456LocalTest = false;
 
   GATTCharacteristic? _notifyCharacteristic;
   GATTCharacteristic? _commandWriteCharacteristic;
@@ -201,10 +200,6 @@ class BluetoothLowEnergyBlePeripheralDataSource
           buffer[4] = length & 0xFF;
           buffer.setRange(5, 5 + toSend, fullBytes, offset);
 
-          // Debug log
-          final String previewHex = _hex(buffer, 16);
-          print('ST456 FRAME pid=${buffer[0]} total=${buffer[1]} num=${buffer[2]} length=$length toSend=$toSend preview=$previewHex');
-
           await _manager.notifyCharacteristic(
             central,
             notifyCharacteristic,
@@ -214,14 +209,6 @@ class BluetoothLowEnergyBlePeripheralDataSource
       }
 
       _packetId = (_packetId + 1) & 0xFF;
-      if (_kRunSt456LocalTest) {
-        // Run a local reconstruction test
-        final int sampleMtu = 20;
-        int sampleChunk = sampleMtu - 3 - 5;
-        if (sampleChunk <= 0) sampleChunk = 1;
-        _runLocalSt456Test(full, sampleChunk);
-      }
-
       return;
     }
 
@@ -449,55 +436,6 @@ class BluetoothLowEnergyBlePeripheralDataSource
     } catch (_) {
       return 20;
     }
-  }
-
-  String _hex(Uint8List data, int maxBytes) {
-    final int len = data.length < maxBytes ? data.length : maxBytes;
-    final List<String> parts = <String>[];
-    for (int i = 0; i < len; i++) {
-      parts.add(data[i].toRadixString(16).padLeft(2, '0'));
-    }
-    return parts.join(' ');
-  }
-
-  void _runLocalSt456Test(String fullMessage, int chunkPayloadSize) {
-    final List<int> bytes = ascii.encode(fullMessage);
-    final int length = bytes.length;
-    final int totalTramas = (length + chunkPayloadSize - 1) ~/ chunkPayloadSize;
-
-    final List<Uint8List> frames = <Uint8List>[];
-    for (int trama = 0; trama < totalTramas; trama++) {
-      final int offset = trama * chunkPayloadSize;
-      final int toSend = (length - offset) < chunkPayloadSize ? (length - offset) : chunkPayloadSize;
-      final Uint8List buffer = Uint8List(5 + toSend);
-      buffer[0] = 0;
-      buffer[1] = totalTramas & 0xFF;
-      buffer[2] = (trama + 1) & 0xFF;
-      buffer[3] = (length >> 8) & 0xFF;
-      buffer[4] = length & 0xFF;
-      buffer.setRange(5, 5 + toSend, bytes, offset);
-      frames.add(buffer);
-    }
-
-    print('ST456 LOCAL TEST frames=${frames.length} chunk=$chunkPayloadSize length=$length');
-
-    // Reconstruct and validate
-    final List<int> reconstructed = <int>[];
-    for (final Uint8List f in frames) {
-      final int declaredTotal = f[1];
-      final int declaredLen = (f[3] << 8) | f[4];
-      if (declaredTotal != frames.length) {
-        print('ERROR: declared total mismatch $declaredTotal vs ${frames.length}');
-      }
-      if (declaredLen != length) {
-        print('ERROR: declared length mismatch $declaredLen vs $length');
-      }
-      reconstructed.addAll(f.sublist(5));
-    }
-
-    final String reconStr = ascii.decode(reconstructed);
-    final bool ok = reconStr == fullMessage;
-    print('ST456 LOCAL TEST reconstruct ok=$ok');
   }
 
   GATTCharacteristic _buildNotifyCharacteristic() {

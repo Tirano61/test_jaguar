@@ -28,32 +28,6 @@ class SimulationDomainService {
     );
   }
 
-  SimulationState advance({
-    required SimulationState current,
-    required int nextWeight,
-  }) {
-    final int nextTick = current.tickInPhase + 1;
-    if (nextTick < timing.ticksPerPhase()) {
-      return current.copyWith(
-        tickInPhase: nextTick,
-        currentWeight: nextWeight,
-      );
-    }
-
-    final SimulationPhase nextPhase = phaseAfter(current.phase);
-    final int nextCycle =
-        nextPhase == SimulationPhase.loadedWaiting ? current.cycle + 1 : current.cycle;
-
-    return current.copyWith(
-      phase: nextPhase,
-      tickInPhase: 0,
-      cycle: nextCycle,
-      currentWeight: nextWeight,
-      phaseStartWeight: nextWeight,
-      phaseTargetWeight: targetWeightForPhase(nextPhase, nextWeight),
-    );
-  }
-
   SimulationPhase phaseAfter(SimulationPhase phase) {
     switch (phase) {
       case SimulationPhase.loadedWaiting:
@@ -64,19 +38,6 @@ class SimulationDomainService {
         return SimulationPhase.loading;
       case SimulationPhase.loading:
         return SimulationPhase.loadedWaiting;
-    }
-  }
-
-  int targetWeightForPhase(SimulationPhase phase, int currentWeight) {
-    switch (phase) {
-      case SimulationPhase.loadedWaiting:
-        return loadedRange.clamp(currentWeight);
-      case SimulationPhase.unloading:
-        return emptyRange.midpoint();
-      case SimulationPhase.emptyWaiting:
-        return emptyRange.clamp(currentWeight);
-      case SimulationPhase.loading:
-        return loadedRange.midpoint();
     }
   }
 
