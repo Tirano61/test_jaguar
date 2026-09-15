@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
-import 'package:test_jaguar/domain/value_objects/st407_screen.dart';
+import 'package:test_jaguar/protocols/st407_remote/st407_screen.dart';
 import 'package:test_jaguar/presentation/controllers/simulator_controller.dart';
 import 'package:test_jaguar/presentation/pages/hydraulic_simulator_page.dart';
 import 'package:test_jaguar/presentation/widgets/protocol_status_header.dart';

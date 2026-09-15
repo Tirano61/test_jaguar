@@ -1,5 +1,5 @@
 import 'package:test_jaguar/domain/entities/scale_measurement.dart';
-import 'package:test_jaguar/domain/value_objects/st407_screen.dart';
+import 'package:test_jaguar/protocols/st407_remote/st407_screen.dart';
 
 class St407PayloadDto {
   const St407PayloadDto({
