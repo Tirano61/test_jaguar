@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:test_jaguar/application/dto/hydraulic_payload_dto.dart';
 import 'package:test_jaguar/application/dto/scale_payload_dto.dart';
-import 'package:test_jaguar/application/dto/st456_payload_dto.dart';
+import 'package:test_jaguar/application/dto/st407_payload_dto.dart';
 import 'package:test_jaguar/application/dto/simulator_status_dto.dart';
 import 'package:test_jaguar/core/constants/ble_constants.dart';
 import 'package:test_jaguar/core/extensions/stream_subscription_extensions.dart';
@@ -15,7 +15,7 @@ import 'package:test_jaguar/domain/value_objects/hydraulic_discharge_command.dar
 import 'package:test_jaguar/domain/value_objects/hydraulic_movement_command.dart';
 import 'package:test_jaguar/domain/value_objects/hydraulic_pto.dart';
 import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
-import 'package:test_jaguar/domain/value_objects/st456_screen.dart';
+import 'package:test_jaguar/domain/value_objects/st407_screen.dart';
 
 class SimulatorOrchestrator {
   SimulatorOrchestrator({
@@ -53,19 +53,19 @@ class SimulatorOrchestrator {
   static const String _guardarDosEvent = 'AT+GUARDARDOS';
 
   SendProtocol _sendProtocol = SendProtocol.jaguarBle;
-  St456Screen _st456Screen = St456Screen.main;
+  St407Screen _st407Screen = St407Screen.main;
   double _selectedHumidity = 10.0;
   ScaleMeasurement _manualMeasurement = ScaleMeasurement.baseline;
-  // Estado para simulación de "kg a cargar" y parcial en pantallas ST456
-  double? _st456InitialKgToLoad;
+  // Estado para simulación de "kg a cargar" y parcial en pantallas ST407
+  double? _st407InitialKgToLoad;
   // Peso actual mostrado en la pantalla de carga (disminuye lentamente)
-  double _st456CurrentDisplayedPeso = 0.0;
-  bool _st456LoadingActive = false;
+  double _st407CurrentDisplayedPeso = 0.0;
+  bool _st407LoadingActive = false;
   // decremento por tick aplicado al peso actual mostrado
-  final double _st456DecrementPerTick = 1.0;
+  final double _st407DecrementPerTick = 1.0;
   // Estado de cuenta regresiva para pantalla 65 (mezclando): inicia en 4:30
-  bool _st456MixingCountdownActive = false;
-  int _st456MixingCurrentSeconds = 4 * 60 + 30;
+  bool _st407MixingCountdownActive = false;
+  int _st407MixingCurrentSeconds = 4 * 60 + 30;
   int _lastSensorInduc = SimulatorStatusDto.initial.measurement.sensorInduc;
   int _weightHoldTicksRemaining = 0;
   int? _heldWeight;
@@ -130,21 +130,21 @@ class SimulatorOrchestrator {
     }
     _sendProtocol = protocol;
     await _bleRepository.updateBleUuids(
-      protocol == SendProtocol.st456Remote
-          ? BleConstants.st456
+      protocol == SendProtocol.st407Remote
+          ? BleConstants.remotoAbf3
           : BleConstants.jaguar,
     );
     _weightHoldTicksRemaining = 0;
     _heldWeight = null;
     _lastSensorInduc = _current.measurement.sensorInduc;
 
-    // Limpiar estado ST456 si ya no estamos en ese protocolo
-    if (_sendProtocol != SendProtocol.st456Remote) {
-      _st456LoadingActive = false;
-      _st456InitialKgToLoad = null;
-      _st456CurrentDisplayedPeso = 0.0;
-      _st456MixingCountdownActive = false;
-      _st456MixingCurrentSeconds = 4 * 60 + 30;
+    // Limpiar estado ST407 si ya no estamos en ese protocolo
+    if (_sendProtocol != SendProtocol.st407Remote) {
+      _st407LoadingActive = false;
+      _st407InitialKgToLoad = null;
+      _st407CurrentDisplayedPeso = 0.0;
+      _st407MixingCountdownActive = false;
+      _st407MixingCurrentSeconds = 4 * 60 + 30;
     }
 
     // Limpiar estado de ejecución hidráulico si ya no estamos en ese
@@ -244,36 +244,36 @@ class SimulatorOrchestrator {
     _pushLog('$event enviado');
   }
 
-  Future<void> setSt456Screen(St456Screen screen) async {
-    if (_st456Screen == screen) {
+  Future<void> setSt407Screen(St407Screen screen) async {
+    if (_st407Screen == screen) {
       return;
     }
 
-    _st456Screen = screen;
-    _emit(_current.copyWith(st456Screen: _st456Screen));
-    _pushLog('Pantalla ST456 seleccionada: ${screen.label}');
+    _st407Screen = screen;
+    _emit(_current.copyWith(st407Screen: _st407Screen));
+    _pushLog('Pantalla ST407 seleccionada: ${screen.label}');
 
-    if (_sendProtocol == SendProtocol.st456Remote) {
+    if (_sendProtocol == SendProtocol.st407Remote) {
       // Inicializar estado de carga cuando se seleccionan pantallas de carga
-      if (screen == St456Screen.loadingRecipe || screen == St456Screen.loadingManual) {
-        _st456InitialKgToLoad = _current.measurement.peso.toDouble();
+      if (screen == St407Screen.loadingRecipe || screen == St407Screen.loadingManual) {
+        _st407InitialKgToLoad = _current.measurement.peso.toDouble();
         // peso mostrado parte del peso actual y luego irá bajando
-        _st456CurrentDisplayedPeso = _st456InitialKgToLoad ?? 0.0;
-        _st456LoadingActive = true;
-        _st456MixingCountdownActive = false;
-        _st456MixingCurrentSeconds = 4 * 60 + 30;
-      } else if (screen == St456Screen.mixing) {
-        _st456LoadingActive = false;
-        _st456InitialKgToLoad = null;
-        _st456CurrentDisplayedPeso = 0.0;
-        _st456MixingCountdownActive = true;
-        _st456MixingCurrentSeconds = 4 * 60 + 30;
+        _st407CurrentDisplayedPeso = _st407InitialKgToLoad ?? 0.0;
+        _st407LoadingActive = true;
+        _st407MixingCountdownActive = false;
+        _st407MixingCurrentSeconds = 4 * 60 + 30;
+      } else if (screen == St407Screen.mixing) {
+        _st407LoadingActive = false;
+        _st407InitialKgToLoad = null;
+        _st407CurrentDisplayedPeso = 0.0;
+        _st407MixingCountdownActive = true;
+        _st407MixingCurrentSeconds = 4 * 60 + 30;
       } else {
-        _st456LoadingActive = false;
-        _st456InitialKgToLoad = null;
-        _st456CurrentDisplayedPeso = 0.0;
-        _st456MixingCountdownActive = false;
-        _st456MixingCurrentSeconds = 4 * 60 + 30;
+        _st407LoadingActive = false;
+        _st407InitialKgToLoad = null;
+        _st407CurrentDisplayedPeso = 0.0;
+        _st407MixingCountdownActive = false;
+        _st407MixingCurrentSeconds = 4 * 60 + 30;
       }
       await _sendCurrentPayloadNow();
     }
@@ -425,7 +425,7 @@ class SimulatorOrchestrator {
         _current.copyWith(
           measurement: measurement,
           sendProtocol: _sendProtocol,
-          st456Screen: _st456Screen,
+          st407Screen: _st407Screen,
           manualMeasurement: _manualMeasurement,
           weightHoldSecondsRemaining: weightHoldSecondsRemaining,
           lastJson: payload,
@@ -460,22 +460,22 @@ class SimulatorOrchestrator {
       ).toJsonUtf8String();
     }
 
-    if (_sendProtocol == SendProtocol.st456Remote) {
+    if (_sendProtocol == SendProtocol.st407Remote) {
       // Para pantallas de carga (loadingRecipe, loadingManual) necesitamos
       // mantener un 'kg a cargar' que parte del valor inicial de peso actual
       // y va disminuyendo muy de a poco; el campo 'parcial' debe reflejar
       // lo que ya se fue descargando (initial - current).
-      if (_st456Screen == St456Screen.loadingRecipe ||
-          _st456Screen == St456Screen.loadingManual) {
+      if (_st407Screen == St407Screen.loadingRecipe ||
+          _st407Screen == St407Screen.loadingManual) {
         // Asegurar inicialización del valor estático "kg a cargar"
-        if (!_st456LoadingActive || _st456InitialKgToLoad == null) {
-          _st456InitialKgToLoad = measurement.peso.toDouble();
-          _st456CurrentDisplayedPeso = _st456InitialKgToLoad ?? 0.0;
-          _st456LoadingActive = true;
+        if (!_st407LoadingActive || _st407InitialKgToLoad == null) {
+          _st407InitialKgToLoad = measurement.peso.toDouble();
+          _st407CurrentDisplayedPeso = _st407InitialKgToLoad ?? 0.0;
+          _st407LoadingActive = true;
         }
 
         // 'kg a cargar' debe mantener el valor inicial (estático)
-        final double initial = _st456InitialKgToLoad ?? measurement.peso.toDouble();
+        final double initial = _st407InitialKgToLoad ?? measurement.peso.toDouble();
         // 'peso actual' se toma del measurement que llega (debe bajar)
         final double pesoActual = measurement.peso.toDouble();
         // 'parcial' es lo que ya se descargó: initial - pesoActual (no negativo)
@@ -483,39 +483,39 @@ class SimulatorOrchestrator {
         final int kgACargar = initial.round();
 
         // Construir cadena según la pantalla
-        if (_st456Screen == St456Screen.loadingRecipe) {
+        if (_st407Screen == St407Screen.loadingRecipe) {
           // formato: pantalla,peso_actual,parcial,kg_a_cargar,ingrediente
-          return '${_st456Screen.code},${pesoActual.round()},$parcial,$kgACargar,Maiz\r\n';
+          return '${_st407Screen.code},${pesoActual.round()},$parcial,$kgACargar,Maiz\r\n';
         }
 
-        if (_st456Screen == St456Screen.loadingManual) {
+        if (_st407Screen == St407Screen.loadingManual) {
           // ingrediente/identificador distinto en la pantalla manual
-          return '${_st456Screen.code},${pesoActual.round()},$parcial,$kgACargar,1\r\n';
+          return '${_st407Screen.code},${pesoActual.round()},$parcial,$kgACargar,1\r\n';
         }
       }
 
       // Pantalla 65 - mezclando: formato pantalla,minutos,segundos
       // Debe iniciar en 65,4,30 y decrementar como reloj.
-      if (_st456Screen == St456Screen.mixing) {
-        if (!_st456MixingCountdownActive) {
-          _st456MixingCountdownActive = true;
-          _st456MixingCurrentSeconds = 4 * 60 + 30;
+      if (_st407Screen == St407Screen.mixing) {
+        if (!_st407MixingCountdownActive) {
+          _st407MixingCountdownActive = true;
+          _st407MixingCurrentSeconds = 4 * 60 + 30;
         }
 
-        final int minutes = _st456MixingCurrentSeconds ~/ 60;
-        final int seconds = _st456MixingCurrentSeconds % 60;
+        final int minutes = _st407MixingCurrentSeconds ~/ 60;
+        final int seconds = _st407MixingCurrentSeconds % 60;
         final String seconds2 = seconds.toString().padLeft(2, '0');
-        final String payload = '${_st456Screen.code},$minutes,$seconds2\r\n';
+        final String payload = '${_st407Screen.code},$minutes,$seconds2\r\n';
 
-        if (_st456MixingCurrentSeconds > 0) {
-          _st456MixingCurrentSeconds -= 1;
+        if (_st407MixingCurrentSeconds > 0) {
+          _st407MixingCurrentSeconds -= 1;
         }
 
         return payload;
       }
 
-      return St456PayloadDto(
-        screen: _st456Screen,
+      return St407PayloadDto(
+        screen: _st407Screen,
         measurement: measurement,
         now: DateTime.now(),
       ).toProtocolString();
@@ -557,26 +557,26 @@ class SimulatorOrchestrator {
 
     ScaleMeasurement base = measurement.copyWith(humedad: _selectedHumidity);
 
-    // Si estamos en protocolo ST456 remoto y en una pantalla de carga, debemos
+    // Si estamos en protocolo ST407 remoto y en una pantalla de carga, debemos
     // mostrar un peso actual que disminuye lentamente mientras 'kg a cargar'
-    // permanece estático (inicial). Para ello usamos _st456CurrentDisplayedPeso.
-    if (_sendProtocol == SendProtocol.st456Remote &&
-        (_st456Screen == St456Screen.loadingRecipe ||
-            _st456Screen == St456Screen.loadingManual)) {
+    // permanece estático (inicial). Para ello usamos _st407CurrentDisplayedPeso.
+    if (_sendProtocol == SendProtocol.st407Remote &&
+        (_st407Screen == St407Screen.loadingRecipe ||
+            _st407Screen == St407Screen.loadingManual)) {
       // Inicializar si es la primera vez
-      if (!_st456LoadingActive || _st456InitialKgToLoad == null) {
-        _st456InitialKgToLoad = base.peso.toDouble();
-        _st456CurrentDisplayedPeso = _st456InitialKgToLoad ?? base.peso.toDouble();
-        _st456LoadingActive = true;
+      if (!_st407LoadingActive || _st407InitialKgToLoad == null) {
+        _st407InitialKgToLoad = base.peso.toDouble();
+        _st407CurrentDisplayedPeso = _st407InitialKgToLoad ?? base.peso.toDouble();
+        _st407LoadingActive = true;
       }
 
       // Decrementar el peso mostrado muy de a poco
-      double next = _st456CurrentDisplayedPeso - _st456DecrementPerTick;
+      double next = _st407CurrentDisplayedPeso - _st407DecrementPerTick;
       if (next < 0.0) next = 0.0;
-      _st456CurrentDisplayedPeso = next;
+      _st407CurrentDisplayedPeso = next;
 
       // Devolver measurement con el peso modificado para UI y payload
-      return base.copyWith(peso: _st456CurrentDisplayedPeso.round());
+      return base.copyWith(peso: _st407CurrentDisplayedPeso.round());
     }
 
     return _withScaleStateFromWeightChange(_withWeightHoldAfterSensorChange(base));

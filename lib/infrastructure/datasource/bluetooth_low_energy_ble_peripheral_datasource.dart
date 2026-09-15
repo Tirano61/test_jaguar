@@ -168,8 +168,8 @@ class BluetoothLowEnergyBlePeripheralDataSource
       return;
     }
 
-    // If active profile is ST456, use binary framing with 5-byte header.
-    if (_activeUuids.serviceUuid.toUpperCase() == BleConstants.st456.serviceUuid.toUpperCase()) {
+    // Perfil remoto ABF3: framing binario con cabecera de 5 bytes.
+    if (_activeUuids.serviceUuid.toUpperCase() == BleConstants.remotoAbf3.serviceUuid.toUpperCase()) {
       // Ensure termination CRLF and send framed ASCII payloads per-central.
       String full = utf8JsonPayload;
       if (!full.endsWith('\r\n')) {

@@ -1,6 +1,6 @@
 enum SendProtocol {
   jaguarBle,
-  st456Remote,
+  st407Remote,
   manual,
   hidraulicoBle;
 
@@ -8,7 +8,7 @@ enum SendProtocol {
     switch (this) {
       case SendProtocol.jaguarBle:
         return 'Jaguar BLE';
-      case SendProtocol.st456Remote:
+      case SendProtocol.st407Remote:
         return 'Remoto ST407';
       case SendProtocol.manual:
         return 'Manual';
