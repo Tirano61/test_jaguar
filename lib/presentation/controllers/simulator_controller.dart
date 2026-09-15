@@ -110,7 +110,7 @@ class SimulatorController extends ChangeNotifier {
     final int nextHold = value.round().clamp(0, 1);
     return _updateManualMeasurement(
       hold: nextHold,
-      estBalanza: nextHold == 1 ? 3 : _state.manualEstBalanza,
+      estBalanza: nextHold == 1 ? 3 : _state.manual.estBalanza,
     );
   }
 
@@ -170,26 +170,10 @@ class SimulatorController extends ChangeNotifier {
         estBalanza: status.measurement.estBalanza,
         weightHoldSecondsRemaining: status.weightHoldSecondsRemaining,
         humidity: status.measurement.humedad,
-        manualTara: status.manualMeasurement.tara,
-        manualHold: status.manualMeasurement.hold,
-        manualVbat: status.manualMeasurement.vbat,
-        manualWeight: status.manualMeasurement.peso,
-        manualEstBalanza: status.manualMeasurement.estBalanza,
-        manualHumidity: status.manualMeasurement.humedad,
-        manualSensorInduc: status.manualMeasurement.sensorInduc,
+        manual: status.manualMeasurement,
         lastJson: status.lastJson,
         logs: status.logs,
-        tomaFuerza: status.tomaFuerza,
-        tomaFuerzaRpm: status.tomaFuerzaRpm,
-        errorEcu: status.errorEcu,
-        tuboPosicion: status.tuboPosicion,
-        guillotinaPosicion: status.guillotinaPosicion,
-        hydraulicDischargeActive: status.hydraulicDischargeActive,
-        hydraulicDischargePaused: status.hydraulicDischargePaused,
-        hydraulicInitialPeso: status.hydraulicInitialPeso,
-        hydraulicTargetPeso: status.hydraulicTargetPeso,
-        lastHydraulicInicio: status.lastHydraulicInicio,
-        lastHydraulicMovimiento: status.lastHydraulicMovimiento,
+        hidraulico: status.hidraulico,
       );
       notifyListeners();
     });
@@ -205,13 +189,13 @@ class SimulatorController extends ChangeNotifier {
     int? sensorInduc,
   }) {
     final ScaleMeasurement next = ScaleMeasurement(
-      tara: tara ?? _state.manualTara,
-      hold: hold ?? _state.manualHold,
-      vbat: vbat ?? _state.manualVbat,
-      peso: weight ?? _state.manualWeight,
-      estBalanza: estBalanza ?? _state.manualEstBalanza,
-      humedad: humidity ?? _state.manualHumidity,
-      sensorInduc: sensorInduc ?? _state.manualSensorInduc,
+      tara: tara ?? _state.manual.tara,
+      hold: hold ?? _state.manual.hold,
+      vbat: vbat ?? _state.manual.vbat,
+      peso: weight ?? _state.manual.peso,
+      estBalanza: estBalanza ?? _state.manual.estBalanza,
+      humedad: humidity ?? _state.manual.humedad,
+      sensorInduc: sensorInduc ?? _state.manual.sensorInduc,
     );
     return _setManualMeasurementUseCase(next);
   }

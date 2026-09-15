@@ -76,18 +76,18 @@ class HydraulicSimulatorPage extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             _HydraulicDiagramCard(
-              tuboPosicion: state.tuboPosicion,
-              guillotinaPosicion: state.guillotinaPosicion,
-              dischargeActive: state.hydraulicDischargeActive,
-              dischargePaused: state.hydraulicDischargePaused,
+              tuboPosicion: state.hidraulico.tuboPosicion,
+              guillotinaPosicion: state.hidraulico.guillotinaPosicion,
+              dischargeActive: state.hidraulico.dischargeActive,
+              dischargePaused: state.hidraulico.dischargePaused,
             ),
             const SizedBox(height: 4),
             _HydraulicWeightCard(
               weight: state.weight,
-              dischargeActive: state.hydraulicDischargeActive,
-              dischargePaused: state.hydraulicDischargePaused,
-              initialPeso: state.hydraulicInitialPeso,
-              targetPeso: state.hydraulicTargetPeso,
+              dischargeActive: state.hidraulico.dischargeActive,
+              dischargePaused: state.hidraulico.dischargePaused,
+              initialPeso: state.hidraulico.initialPeso,
+              targetPeso: state.hidraulico.targetPeso,
               humidity: state.humidity,
               onHumidityChanged: controller.setHumidity,
               onWeightChanged: controller.setHydraulicPeso,
@@ -95,12 +95,12 @@ class HydraulicSimulatorPage extends StatelessWidget {
             const SizedBox(height: 4),
             SectionCard(
               title: 'Último AT+INICIO recibido',
-              child: _InicioSummary(command: state.lastHydraulicInicio),
+              child: _InicioSummary(command: state.hidraulico.lastInicio),
             ),
             const SizedBox(height: 4),
             SectionCard(
               title: 'Último AT+MOVIMIENTO recibido',
-              child: _MovimientoSummary(command: state.lastHydraulicMovimiento),
+              child: _MovimientoSummary(command: state.hidraulico.lastMovimiento),
             ),
             const SizedBox(height: 4),
             SectionCard(
@@ -109,7 +109,7 @@ class HydraulicSimulatorPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   DropdownButtonFormField<int>(
-                    initialValue: state.tomaFuerza.clamp(
+                    initialValue: state.hidraulico.tomaFuerza.clamp(
                       HydraulicPtoState.off,
                       HydraulicPtoState.requestOff,
                     ),
@@ -147,13 +147,13 @@ class HydraulicSimulatorPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   _PtoRpmField(
-                    value: state.tomaFuerzaRpm,
-                    ptoOn: HydraulicPtoState.isOn(state.tomaFuerza),
+                    value: state.hidraulico.tomaFuerzaRpm,
+                    ptoOn: HydraulicPtoState.isOn(state.hidraulico.tomaFuerza),
                     onChanged: controller.setTomaFuerzaRpm,
                   ),
                   const SizedBox(height: 12),
                   _ErrorEcuField(
-                    value: state.errorEcu,
+                    value: state.hidraulico.errorEcu,
                     onChanged: controller.setErrorEcu,
                   ),
                   const SizedBox(height: 12),
