@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:test_jaguar/domain/value_objects/hydraulic_actuator_position.dart';
-import 'package:test_jaguar/domain/value_objects/hydraulic_discharge_command.dart';
-import 'package:test_jaguar/domain/value_objects/hydraulic_movement_command.dart';
-import 'package:test_jaguar/domain/value_objects/hydraulic_pto.dart';
+import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_actuator_position.dart';
+import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_discharge_command.dart';
+import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_movement_command.dart';
+import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_pto.dart';
 import 'package:test_jaguar/presentation/controllers/simulator_controller.dart';
 import 'package:test_jaguar/presentation/state/simulator_view_state.dart';
 import 'package:test_jaguar/presentation/widgets/protocol_status_header.dart';

@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:test_jaguar/domain/entities/scale_measurement.dart';
-import 'package:test_jaguar/domain/value_objects/hydraulic_pto.dart';
+import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_pto.dart';
 
 /// JSON del modo Hidráulico BLE: los campos base de `ScaleMeasurement` más
 /// los campos nuevos del protocolo (`tomaFuerza`, `rpm`, `errorEcu`). Se
