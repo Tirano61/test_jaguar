@@ -208,6 +208,7 @@ void main() {
       await pumpEventQueue();
 
       await harness.receive('AT+INICIO=1000,300,100,1,2\r\n');
+      await harness.actuatorSeconds(6); // el tubo termina de abrir
       await harness.tick(); // 1000 -> 950
 
       // Una emisión de estado no relacionada repite el último comando sin

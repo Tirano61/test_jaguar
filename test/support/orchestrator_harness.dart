@@ -198,6 +198,15 @@ class Harness {
     await pumpEventQueue();
   }
 
+  /// Avanza el reloj de actuadores del modo Hidráulico [segundos] pasos. Es
+  /// otro reloj que el del motor: mueve tubo y guillotina, no el peso.
+  Future<void> actuatorSeconds(int segundos) async {
+    for (int i = 0; i < segundos; i++) {
+      await orchestrator.tickActuators();
+    }
+    await pumpEventQueue();
+  }
+
   Future<void> tick([ScaleMeasurement? measurement]) async {
     simulation.tick(measurement);
     await pumpEventQueue();

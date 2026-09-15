@@ -8,6 +8,8 @@ import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_pto.dart';
 Map<String, dynamic> _payload({
   required int tomaFuerza,
   int tomaFuerzaRpm = 800,
+  int tubo = 0,
+  int gillo = 0,
 }) {
   return jsonDecode(
     HydraulicPayloadDto(
@@ -15,6 +17,8 @@ Map<String, dynamic> _payload({
       tomaFuerza: tomaFuerza,
       tomaFuerzaRpm: tomaFuerzaRpm,
       errorEcu: '',
+      tubo: tubo,
+      gillo: gillo,
     ).toJsonUtf8String(),
   ) as Map<String, dynamic>;
 }
@@ -43,5 +47,13 @@ void main() {
       _payload(tomaFuerza: HydraulicPtoState.on, tomaFuerzaRpm: 0)['rpm'],
       HydraulicPtoRpm.min,
     );
+  });
+
+  test('tubo y gillo viajan tal cual se los pasa', () {
+    final Map<String, dynamic> json =
+        _payload(tomaFuerza: HydraulicPtoState.off, tubo: 2, gillo: 37);
+
+    expect(json['tubo'], 2);
+    expect(json['gillo'], 37);
   });
 }
