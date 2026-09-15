@@ -9,7 +9,7 @@ import 'package:test_jaguar/application/use_cases/observe_simulator_status_use_c
 import 'package:test_jaguar/application/use_cases/set_humidity_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_hydraulic_peso_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_send_protocol_use_case.dart';
-import 'package:test_jaguar/application/use_cases/set_st456_screen_use_case.dart';
+import 'package:test_jaguar/application/use_cases/set_st407_screen_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_toma_fuerza_rpm_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_toma_fuerza_use_case.dart';
 import 'package:test_jaguar/application/use_cases/start_simulation_use_case.dart';
@@ -17,7 +17,7 @@ import 'package:test_jaguar/application/use_cases/stop_simulation_use_case.dart'
 import 'package:test_jaguar/core/constants/ble_constants.dart';
 import 'package:test_jaguar/domain/entities/scale_measurement.dart';
 import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
-import 'package:test_jaguar/domain/value_objects/st456_screen.dart';
+import 'package:test_jaguar/domain/value_objects/st407_screen.dart';
 import 'package:test_jaguar/domain/value_objects/simulation_phase.dart';
 import 'package:test_jaguar/presentation/state/simulator_view_state.dart';
 
@@ -28,7 +28,7 @@ class SimulatorController extends ChangeNotifier {
     required ObserveSimulatorStatusUseCase observeStatusUseCase,
     required SetHumidityUseCase setHumidityUseCase,
     required SetSendProtocolUseCase setSendProtocolUseCase,
-    required SetSt456ScreenUseCase setSt456ScreenUseCase,
+    required SetSt407ScreenUseCase setSt407ScreenUseCase,
     required SetManualMeasurementUseCase setManualMeasurementUseCase,
     required SetTomaFuerzaUseCase setTomaFuerzaUseCase,
     required SetTomaFuerzaRpmUseCase setTomaFuerzaRpmUseCase,
@@ -40,7 +40,7 @@ class SimulatorController extends ChangeNotifier {
         _observeStatusUseCase = observeStatusUseCase,
         _setHumidityUseCase = setHumidityUseCase,
         _setSendProtocolUseCase = setSendProtocolUseCase,
-      _setSt456ScreenUseCase = setSt456ScreenUseCase,
+      _setSt407ScreenUseCase = setSt407ScreenUseCase,
         _setManualMeasurementUseCase = setManualMeasurementUseCase,
         _setTomaFuerzaUseCase = setTomaFuerzaUseCase,
         _setTomaFuerzaRpmUseCase = setTomaFuerzaRpmUseCase,
@@ -55,7 +55,7 @@ class SimulatorController extends ChangeNotifier {
   final ObserveSimulatorStatusUseCase _observeStatusUseCase;
   final SetHumidityUseCase _setHumidityUseCase;
   final SetSendProtocolUseCase _setSendProtocolUseCase;
-  final SetSt456ScreenUseCase _setSt456ScreenUseCase;
+  final SetSt407ScreenUseCase _setSt407ScreenUseCase;
   final SetManualMeasurementUseCase _setManualMeasurementUseCase;
   final SetTomaFuerzaUseCase _setTomaFuerzaUseCase;
   final SetTomaFuerzaRpmUseCase _setTomaFuerzaRpmUseCase;
@@ -83,8 +83,8 @@ class SimulatorController extends ChangeNotifier {
   Future<void> selectSendProtocol(SendProtocol protocol) =>
       _setSendProtocolUseCase(protocol);
 
-    Future<void> selectSt456Screen(St456Screen screen) =>
-      _setSt456ScreenUseCase(screen);
+    Future<void> selectSt407Screen(St407Screen screen) =>
+      _setSt407ScreenUseCase(screen);
 
   Future<void> setTomaFuerza(int value) => _setTomaFuerzaUseCase(value);
 
@@ -158,19 +158,19 @@ class SimulatorController extends ChangeNotifier {
         lastReceivedCommand: status.bleStatus.lastReceivedCommand,
         running: status.running,
         sendProtocol: status.sendProtocol,
-        serviceUuid: status.sendProtocol == SendProtocol.st456Remote
-          ? BleConstants.st456.serviceUuid
+        serviceUuid: status.sendProtocol == SendProtocol.st407Remote
+          ? BleConstants.remotoAbf3.serviceUuid
           : BleConstants.jaguar.serviceUuid,
-        characteristicUuid: status.sendProtocol == SendProtocol.st456Remote
-          ? BleConstants.st456.notifyUuid
+        characteristicUuid: status.sendProtocol == SendProtocol.st407Remote
+          ? BleConstants.remotoAbf3.notifyUuid
           : BleConstants.jaguar.notifyUuid,
-        serviceWriteUuid: status.sendProtocol == SendProtocol.st456Remote
-          ? BleConstants.st456.writeServiceUuid
+        serviceWriteUuid: status.sendProtocol == SendProtocol.st407Remote
+          ? BleConstants.remotoAbf3.writeServiceUuid
           : BleConstants.jaguar.writeServiceUuid,
-        characteristicWriteUuid: status.sendProtocol == SendProtocol.st456Remote
-          ? BleConstants.st456.writeUuid
+        characteristicWriteUuid: status.sendProtocol == SendProtocol.st407Remote
+          ? BleConstants.remotoAbf3.writeUuid
           : BleConstants.jaguar.writeUuid,
-        st456Screen: status.st456Screen,
+        st407Screen: status.st407Screen,
         phaseName: status.phase.label,
         weight: status.measurement.peso,
         sensorInduc: status.measurement.sensorInduc,

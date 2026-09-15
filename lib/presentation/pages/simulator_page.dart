@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
-import 'package:test_jaguar/domain/value_objects/st456_screen.dart';
+import 'package:test_jaguar/domain/value_objects/st407_screen.dart';
 import 'package:test_jaguar/presentation/controllers/simulator_controller.dart';
 import 'package:test_jaguar/presentation/pages/hydraulic_simulator_page.dart';
 import 'package:test_jaguar/presentation/widgets/protocol_status_header.dart';
@@ -91,12 +91,12 @@ class SimulatorPage extends StatelessWidget {
                       advertising: state.advertising,
                       connected: state.connected,
                     ),
-                    if (state.sendProtocol == SendProtocol.st456Remote) ...<Widget>[
+                    if (state.sendProtocol == SendProtocol.st407Remote) ...<Widget>[
                       const SizedBox(height: 8),
                       SectionCard(
-                        title: 'Pantalla ST456',
-                        child: DropdownButtonFormField<St456Screen>(
-                          initialValue: state.st456Screen,
+                        title: 'Pantalla ST407',
+                        child: DropdownButtonFormField<St407Screen>(
+                          initialValue: state.st407Screen,
                           isExpanded: true,
                           decoration: const InputDecoration(
                             border: OutlineInputBorder(),
@@ -104,17 +104,17 @@ class SimulatorPage extends StatelessWidget {
                             contentPadding:
                                 EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                           ),
-                          items: St456Screen.values
+                          items: St407Screen.values
                               .map(
-                                (St456Screen s) => DropdownMenuItem<St456Screen>(
+                                (St407Screen s) => DropdownMenuItem<St407Screen>(
                                   value: s,
                                   child: Text(s.label),
                                 ),
                               )
                               .toList(),
-                          onChanged: (St456Screen? next) {
+                          onChanged: (St407Screen? next) {
                             if (next != null) {
-                              controller.selectSt456Screen(next);
+                              controller.selectSt407Screen(next);
                             }
                           },
                         ),
@@ -207,7 +207,7 @@ class SimulatorPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     SectionCard(
-                      title: state.sendProtocol == SendProtocol.st456Remote
+                      title: state.sendProtocol == SendProtocol.st407Remote
                           ? 'Ultima cadena enviada'
                           : 'Ultimo JSON enviado',
                       child: Container(
@@ -391,9 +391,9 @@ class _HeroWeightCard extends StatelessWidget {
                 ),
           ),
           const SizedBox(height: 10),
-          // Para protocolo ST456 remoto no mostramos los chips de estado;
+          // Para protocolo ST407 remoto no mostramos los chips de estado;
           // en su lugar mostramos una aclaración sobre la cabecera binaria.
-          if (sendProtocol != SendProtocol.st456Remote)
+          if (sendProtocol != SendProtocol.st407Remote)
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -412,7 +412,7 @@ class _HeroWeightCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: 6.0),
               child: Text(
-                'Protocolo ST456 (remoto): se envía una cabecera binaria de 5 bytes antes de la cadena, separada por coma.',
+                'Protocolo ST407 (remoto): se envía una cabecera binaria de 5 bytes antes de la cadena, separada por coma.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Colors.white.withValues(alpha: 0.90),
                     ),
@@ -450,7 +450,7 @@ class _HeroWeightCard extends StatelessWidget {
                 },
               ),
             ),
-          ] else if (sendProtocol == SendProtocol.st456Remote) ...<Widget>[
+          ] else if (sendProtocol == SendProtocol.st407Remote) ...<Widget>[
             const SizedBox(height: 8),
             // Ya mostramos la aclaración arriba, mantener separación visual
           ] else ...<Widget>[

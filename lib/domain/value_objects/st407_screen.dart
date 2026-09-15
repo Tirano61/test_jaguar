@@ -1,4 +1,4 @@
-enum St456Screen {
+enum St407Screen {
   main(60, '60 - Pantalla principal'),
   loadingRecipe(61, '61 - Cargando por recetas'),
   loadingManual(62, '62 - Cargando manual'),
@@ -9,7 +9,7 @@ enum St456Screen {
   chooseAutonomous(67, '67 - Elegir autonomo'),
   chooseGuide(68, '68 - Elegir guia');
 
-  const St456Screen(this.code, this.label);
+  const St407Screen(this.code, this.label);
 
   final int code;
   final String label;

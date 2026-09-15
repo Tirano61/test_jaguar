@@ -5,7 +5,7 @@ import 'package:test_jaguar/domain/value_objects/hydraulic_discharge_command.dar
 import 'package:test_jaguar/domain/value_objects/hydraulic_movement_command.dart';
 import 'package:test_jaguar/domain/value_objects/hydraulic_pto.dart';
 import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
-import 'package:test_jaguar/domain/value_objects/st456_screen.dart';
+import 'package:test_jaguar/domain/value_objects/st407_screen.dart';
 import 'package:test_jaguar/domain/value_objects/simulation_phase.dart';
 
 class SimulatorStatusDto {
@@ -13,7 +13,7 @@ class SimulatorStatusDto {
     required this.bleStatus,
     required this.running,
     required this.sendProtocol,
-    required this.st456Screen,
+    required this.st407Screen,
     required this.phase,
     required this.measurement,
     required this.manualMeasurement,
@@ -36,7 +36,7 @@ class SimulatorStatusDto {
   final BlePeripheralStatus bleStatus;
   final bool running;
   final SendProtocol sendProtocol;
-  final St456Screen st456Screen;
+  final St407Screen st407Screen;
   final SimulationPhase phase;
   final ScaleMeasurement measurement;
   final ScaleMeasurement manualMeasurement;
@@ -69,7 +69,7 @@ class SimulatorStatusDto {
     bleStatus: BlePeripheralStatus.initial,
     running: false,
     sendProtocol: SendProtocol.jaguarBle,
-    st456Screen: St456Screen.main,
+    st407Screen: St407Screen.main,
     phase: SimulationPhase.loadedWaiting,
     measurement: ScaleMeasurement.baseline,
     manualMeasurement: ScaleMeasurement.baseline,
@@ -91,7 +91,7 @@ class SimulatorStatusDto {
     BlePeripheralStatus? bleStatus,
     bool? running,
     SendProtocol? sendProtocol,
-    St456Screen? st456Screen,
+    St407Screen? st407Screen,
     SimulationPhase? phase,
     ScaleMeasurement? measurement,
     ScaleMeasurement? manualMeasurement,
@@ -114,7 +114,7 @@ class SimulatorStatusDto {
       bleStatus: bleStatus ?? this.bleStatus,
       running: running ?? this.running,
       sendProtocol: sendProtocol ?? this.sendProtocol,
-      st456Screen: st456Screen ?? this.st456Screen,
+      st407Screen: st407Screen ?? this.st407Screen,
       phase: phase ?? this.phase,
       measurement: measurement ?? this.measurement,
       manualMeasurement: manualMeasurement ?? this.manualMeasurement,
