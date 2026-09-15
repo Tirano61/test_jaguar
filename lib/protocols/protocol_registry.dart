@@ -28,7 +28,7 @@ class ProtocolRegistry {
     return ProtocolRegistry(<SimulatorProtocol>[
       const JaguarBleProtocol(),
       const St407RemoteProtocol(),
-      const ManualProtocol(),
+      ManualProtocol(),
       HydraulicProtocol(),
     ]);
   }

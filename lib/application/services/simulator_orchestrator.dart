@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:test_jaguar/application/dto/scale_payload_dto.dart';
 import 'package:test_jaguar/application/dto/simulator_status_dto.dart';
 import 'package:test_jaguar/application/dto/st407_payload_dto.dart';
 import 'package:test_jaguar/core/extensions/stream_subscription_extensions.dart';
@@ -14,7 +13,9 @@ import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_discharge_command
 import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_movement_command.dart';
 import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_protocol.dart';
 import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_state.dart';
+import 'package:test_jaguar/protocols/manual/manual_protocol.dart';
 import 'package:test_jaguar/protocols/protocol_registry.dart';
+import 'package:test_jaguar/protocols/shared/scale_payload.dart';
 import 'package:test_jaguar/protocols/simulator_protocol.dart';
 
 class SimulatorOrchestrator {
@@ -40,6 +41,11 @@ class SimulatorOrchestrator {
   HydraulicProtocol get _hydraulic =>
       _registry.of(SendProtocol.hidraulicoBle) as HydraulicProtocol;
 
+  /// El módulo Manual. También se accede con otro protocolo activo: `AT+RSTHOLD`
+  /// no tiene guard y le llega igual.
+  ManualProtocol get _manual =>
+      _registry.of(SendProtocol.manual) as ManualProtocol;
+
   final StreamController<SimulatorStatusDto> _statusController =
       StreamController<SimulatorStatusDto>.broadcast();
 
@@ -57,7 +63,6 @@ class SimulatorOrchestrator {
   SendProtocol _sendProtocol = SendProtocol.jaguarBle;
   St407Screen _st407Screen = St407Screen.main;
   double _selectedHumidity = 10.0;
-  ScaleMeasurement _manualMeasurement = ScaleMeasurement.baseline;
   // Estado para simulación de "kg a cargar" y parcial en pantallas ST407
   double? _st407InitialKgToLoad;
   // Peso actual mostrado en la pantalla de carga (disminuye lentamente)
@@ -207,12 +212,26 @@ class SimulatorOrchestrator {
   }
 
   Future<void> setManualMeasurement(ScaleMeasurement measurement) async {
-    _manualMeasurement = _normalizeManualMeasurement(measurement);
-    _emit(_current.copyWith(manualMeasurement: _manualMeasurement));
+    _manual.set(measurement);
+    _emit(_current.copyWith(manualMeasurement: _manual.measurement));
 
     if (_sendProtocol == SendProtocol.manual) {
       await _sendCurrentPayloadNow();
     }
+  }
+
+  /// Publica el resultado de un comando del modo Manual. [log] en null
+  /// significa que el módulo no cambió nada: ni emisión, ni log, ni reenvío.
+  ///
+  /// El orden importa: primero se emite la medición y recién después el log,
+  /// igual que antes, porque `_pushLog` también emite.
+  Future<void> _applyManualCommand(String? log) async {
+    if (log == null) {
+      return;
+    }
+    _emit(_current.copyWith(manualMeasurement: _manual.measurement));
+    _pushLog(log);
+    await _sendCurrentPayloadNow();
   }
 
   Future<void> setHumidity(double value) async {
@@ -311,7 +330,7 @@ class SimulatorOrchestrator {
     // del tick mandaba el peso viejo.
     final ScaleMeasurement measurement;
     if (_sendProtocol == SendProtocol.manual) {
-      measurement = _manualMeasurement;
+      measurement = _manual.measurement;
     } else if (_sendProtocol == SendProtocol.hidraulicoBle) {
       measurement = _hydraulic.measurement(humidity: _selectedHumidity);
     } else {
@@ -342,7 +361,7 @@ class SimulatorOrchestrator {
           sendProtocol: _sendProtocol,
           bleUuids: _protocol.bleUuids,
           st407Screen: _st407Screen,
-          manualMeasurement: _manualMeasurement,
+          manualMeasurement: _manual.measurement,
           weightHoldSecondsRemaining: weightHoldSecondsRemaining,
           lastJson: payload,
         ),
@@ -442,7 +461,7 @@ class SimulatorOrchestrator {
 
   ScaleMeasurement _measurementForCurrentProtocol(ScaleMeasurement measurement) {
     if (_sendProtocol == SendProtocol.manual) {
-      return _manualMeasurement;
+      return _manual.measurement;
     }
 
     // Hidráulico BLE no usa el motor de simulación automático (measurement,
@@ -488,23 +507,6 @@ class SimulatorOrchestrator {
     return double.parse(clamped.toStringAsFixed(1));
   }
 
-  ScaleMeasurement _normalizeManualMeasurement(ScaleMeasurement measurement) {
-    final double normalizedHumidity =
-        double.parse(measurement.humedad.clamp(0.0, 22.0).toStringAsFixed(1));
-    final double normalizedVbat =
-        double.parse(measurement.vbat.clamp(0.0, 5.0).toStringAsFixed(1));
-
-    return measurement.copyWith(
-      tara: measurement.tara.clamp(0, 22000),
-      hold: measurement.hold.clamp(0, 1),
-      vbat: normalizedVbat,
-      peso: measurement.peso.clamp(0, 22000),
-      estBalanza: measurement.estBalanza.clamp(0, 5),
-      humedad: normalizedHumidity,
-      sensorInduc: measurement.sensorInduc.clamp(0, 1),
-    );
-  }
-
   ScaleMeasurement _withWeightHoldAfterSensorChange(
     ScaleMeasurement measurement,
   ) {
@@ -543,23 +545,12 @@ class SimulatorOrchestrator {
       return;
     }
 
+    // AT+RSTHOLD es el único comando sin guard de protocolo: se aplica al modo
+    // Manual aunque el activo sea otro, y entonces reenvía un payload del
+    // protocolo activo, no uno manual. Comportamiento heredado, fijado por
+    // `at_command_routing_test.dart`.
     if (_isResetHoldCommand(normalizedCommand)) {
-      final ScaleMeasurement nextManual = _normalizeManualMeasurement(
-        _manualMeasurement.copyWith(
-          hold: 0,
-          estBalanza: 1,
-        ),
-      );
-
-      if (nextManual.hold == _manualMeasurement.hold &&
-          nextManual.estBalanza == _manualMeasurement.estBalanza) {
-        return;
-      }
-
-      _manualMeasurement = nextManual;
-      _emit(_current.copyWith(manualMeasurement: _manualMeasurement));
-      _pushLog('Comando aplicado: AT+RSTHOLD -> hold=0');
-      await _sendCurrentPayloadNow();
+      await _applyManualCommand(_manual.applyResetHold());
       return;
     }
 
@@ -567,50 +558,13 @@ class SimulatorOrchestrator {
       if (_sendProtocol != SendProtocol.manual) {
         return;
       }
-
-      final bool activateTare = _manualMeasurement.tara == 0;
-      final ScaleMeasurement toggledMeasurement = activateTare
-          ? _manualMeasurement.copyWith(
-              tara: _manualMeasurement.peso,
-              peso: 0,
-            )
-          : _manualMeasurement.copyWith(
-              tara: 0,
-              peso: (_manualMeasurement.peso + _manualMeasurement.tara)
-                  .clamp(0, 22000)
-                  .toInt(),
-            );
-      final ScaleMeasurement nextManual =
-          _normalizeManualMeasurement(toggledMeasurement);
-
-      if (nextManual.tara == _manualMeasurement.tara &&
-          nextManual.peso == _manualMeasurement.peso) {
-        return;
-      }
-
-      _manualMeasurement = nextManual;
-      _emit(_current.copyWith(manualMeasurement: _manualMeasurement));
-      _pushLog(
-        activateTare
-            ? 'Comando aplicado: AT+TARA -> tara activada'
-            : 'Comando aplicado: AT+TARA -> tara desactivada',
-      );
-      await _sendCurrentPayloadNow();
+      await _applyManualCommand(_manual.applyToggleTare());
       return;
     }
 
     if (_isZeroWeightCommand(normalizedCommand)) {
       if (_sendProtocol == SendProtocol.manual) {
-        if (_manualMeasurement.tara > 0 || _manualMeasurement.peso == 0) {
-          return;
-        }
-
-        _manualMeasurement = _normalizeManualMeasurement(
-          _manualMeasurement.copyWith(peso: 0),
-        );
-        _emit(_current.copyWith(manualMeasurement: _manualMeasurement));
-        _pushLog('Comando aplicado: AT+CERO -> peso=0 (manual)');
-        await _sendCurrentPayloadNow();
+        await _applyManualCommand(_manual.applyZeroWeight());
         return;
       }
 
