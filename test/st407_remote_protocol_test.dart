@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
-import 'package:test_jaguar/domain/value_objects/st407_screen.dart';
+import 'package:test_jaguar/protocols/st407_remote/st407_screen.dart';
 
 import 'support/orchestrator_harness.dart';
 

@@ -1,5 +1,5 @@
 import 'package:test_jaguar/application/services/simulator_orchestrator.dart';
-import 'package:test_jaguar/domain/value_objects/st407_screen.dart';
+import 'package:test_jaguar/protocols/st407_remote/st407_screen.dart';
 
 class SetSt407ScreenUseCase {
   const SetSt407ScreenUseCase(this._orchestrator);
