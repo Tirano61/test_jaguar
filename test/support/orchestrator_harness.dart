@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:test_jaguar/application/dto/simulator_status_dto.dart';
 import 'package:test_jaguar/application/services/simulator_orchestrator.dart';
 import 'package:test_jaguar/core/constants/ble_constants.dart';
+import 'package:test_jaguar/core/constants/payload_framing.dart';
 import 'package:test_jaguar/domain/entities/ble_peripheral_status.dart';
 import 'package:test_jaguar/domain/entities/scale_measurement.dart';
 import 'package:test_jaguar/domain/repositories/ble_peripheral_repository.dart';
@@ -19,10 +20,11 @@ class FakeBleRepository implements BlePeripheralRepository {
 
   final List<String> notifiedPayloads = <String>[];
 
-  /// Perfiles GATT que el orquestador pidió anunciar, en orden. Sirve para
-  /// verificar que cambiar de protocolo rearma el advertising con los UUIDs
-  /// correctos.
-  final List<BleUuids> uuidUpdates = <BleUuids>[];
+  /// Perfiles que el orquestador pidió anunciar, en orden. Sirve para
+  /// verificar que cambiar de protocolo rearma el advertising con los UUIDs y
+  /// el framing correctos.
+  final List<({BleUuids uuids, PayloadFraming framing})> uuidUpdates =
+      <({BleUuids uuids, PayloadFraming framing})>[];
 
   int _sequence = 0;
 
@@ -51,8 +53,11 @@ class FakeBleRepository implements BlePeripheralRepository {
   Future<void> stopAdvertising() async {}
 
   @override
-  Future<void> updateBleUuids(BleUuids uuids) async {
-    uuidUpdates.add(uuids);
+  Future<void> updateBleProfile({
+    required BleUuids uuids,
+    required PayloadFraming framing,
+  }) async {
+    uuidUpdates.add((uuids: uuids, framing: framing));
   }
 
   @override
