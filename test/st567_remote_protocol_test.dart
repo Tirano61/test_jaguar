@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:test_jaguar/core/constants/payload_framing.dart';
 import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
 import 'package:test_jaguar/protocols/st567/st567_screen.dart';
+import 'package:test_jaguar/protocols/st567/st567_state.dart';
 
 import 'support/orchestrator_harness.dart';
 
@@ -95,5 +96,76 @@ void main() {
     await pumpEventQueue();
 
     expect(harness.lastPayload, startsWith('0,1000,'));
+  });
+
+  group('comandos CTR', () {
+    test('llegan escapados como los entrega el datasource y responden',
+        () async {
+      final Harness harness = await _st567Harness();
+
+      await harness.receive(r'CTR,elegirReceta\r\n');
+      expect(harness.lastPayload, startsWith('60,5,1,Vacas Lecheras,1500,'));
+      expect(harness.latest.st567.screen, St567Screen.elegirRecetaPreset);
+      expect(harness.lastLog, contains('60 - Elegir receta con preset'));
+    });
+
+    test('el operario conserva mayúsculas y espacios', () async {
+      final Harness harness = await _st567Harness();
+      await harness.receive(r'CTR,cargaManual\r\n');
+      await harness.receive(r'CTR,select,1,100\r\n');
+      await harness.tickWith(peso: 1000);
+      await harness.receive(r'CTR,acum,Juan\sPerez\r\n');
+
+      expect(harness.latest.st567.operario, 'Juan Perez');
+      expect(harness.lastLog, contains('operario Juan Perez'));
+    });
+
+    test('con otro protocolo activo se ignoran y no se notifica nada',
+        () async {
+      final Harness harness = await newHarness();
+      await pumpEventQueue();
+      final int enviados = harness.payloads.length;
+
+      await harness.receive(r'CTR,elegirReceta\r\n');
+
+      expect(harness.payloads, hasLength(enviados));
+      expect(harness.latest.st567.screen, St567Screen.principal);
+      expect(harness.lastLog, contains('seleccioná "Remoto ST567"'));
+    });
+
+    test('en una pantalla de carga la UI ve lo que falta, y al salir vuelve '
+        'el peso de la balanza', () async {
+      final Harness harness = await _st567Harness();
+      await harness.receive('CTR,cargaManual\r\n');
+      await harness.receive('CTR,select,1,500\r\n');
+
+      await harness.tickWith(peso: 1000);
+      expect(harness.lastPayload, '2,25,25,500,1,Maiz,0,0,0\r\n');
+      expect(harness.pesoEmitido, 475);
+
+      // El envío inmediato del ESC no puede tomar el 475 como peso de la
+      // balanza.
+      await harness.receive('CTR,esc\r\n');
+      expect(harness.lastPayload, startsWith('0,1000,1,kg,'));
+      expect(harness.pesoEmitido, 1000);
+    });
+
+    test('los AT+ siguen funcionando en el modo ST567', () async {
+      final Harness harness = await _st567Harness();
+      await harness.receive('AT+DETENER\r\n');
+      expect(harness.lastLog, contains('AT+DETENER recibido pero se ignora'));
+    });
+  });
+
+  test('las opciones se guardan aunque el protocolo activo sea otro',
+      () async {
+    final Harness harness = await newHarness();
+    await harness.orchestrator.setSt567Options(
+      const St567Options(recetasConPreset: false),
+    );
+    await harness.orchestrator.setSendProtocol(SendProtocol.st567);
+    await harness.receive('CTR,elegirReceta\r\n');
+
+    expect(harness.lastPayload, startsWith('30,5,'));
   });
 }

@@ -9,8 +9,8 @@ import 'package:test_jaguar/core/constants/payload_framing.dart';
 /// **formato del payload** y en el **perfil BLE**, no en su superficie de
 /// comandos. Los comandos `AT+` que hoy acepta el simulador o tocan estado
 /// compartido (`AT+RSTHOLD`, `AT+TARA`, `AT+CERO`) o son exclusivos de un
-/// protocolo, y los protocolos que vienen (ST456web, ST567) usan otra gramática
-/// (`CTR,<comando>`), así que no hay nada que generalizar ahí. Cada módulo
+/// protocolo, y los remotos nuevos (el ST567, y el ST456web cuando llegue) usan
+/// otra gramática (`CTR,<comando>`), así que no hay nada que generalizar ahí. Cada módulo
 /// expone además su propia API de configuración, que no pasa por acá.
 ///
 /// Va a crecer un miembro por paso a medida que se migre cada protocolo: hoy
@@ -27,8 +27,8 @@ abstract class SimulatorProtocol {
 
   /// La trama que viaja por notify para [measurement].
   ///
-  /// Es lo único que los cuatro protocolos hacen de forma realmente
-  /// polimórfica: tres arman JSON (con distintos campos) y el ST407 arma una
-  /// cadena separada por coma.
+  /// Es lo único que todos los protocolos hacen de forma realmente
+  /// polimórfica: tres arman JSON (con distintos campos) y los remotos ST407 y
+  /// ST567 arman una cadena separada por coma.
   String encodePayload(ScaleMeasurement measurement);
 }

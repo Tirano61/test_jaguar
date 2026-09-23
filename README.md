@@ -19,6 +19,7 @@ rearma el advertising con el perfil GATT que corresponda.
 | **Remoto ST407** | Indicador remoto. Se elige qué pantalla mostrar (códigos 100-108) y el simulador notifica su cadena | Cadena separada por coma, con cabecera binaria de 5 bytes | ABF3 |
 | **Manual** | Balanza con los valores fijados a mano desde la UI. Los automatismos están apagados | JSON de 7 claves | ABF0 / ABF6 |
 | **Hidráulico BLE** | Caja de manejo de tubo y guillotina, con descarga automática | JSON de 7 claves + `tomaFuerza`, `rpm`, `errorEcu`, `tubo` y `gillo` | ABF0 / ABF6 |
+| **Remoto ST567** | Indicador remoto que responde a la app: listas de recetas, ingredientes y trabajos, carga y descarga animadas, mezcla y sincronización (pantallas 0-60) | Cadena separada por coma, con cabecera binaria de 5 bytes | ABF3 |
 
 ## Cómo se usa
 
@@ -41,6 +42,7 @@ Llegan por *characteristic write* desde la app conectada.
 | `AT+DETENER` / `AT+REANUDAR` | Hidráulico | Pausa y retoma la descarga |
 | `AT+FINALIZAR` | Hidráulico | Corta la descarga sin guardar |
 | `AT+MOVIMIENTO=<tipo>` | Hidráulico | Abre y cierra tubo o guillotina |
+| `CTR,<comando>[,<arg>…]` | Remoto ST567 | Los comandos de la app remota (`sync`, `elegirReceta`, `select`, `acum`, `esc`…); ver [docs/protocolo-simulador-st567.md](docs/protocolo-simulador-st567.md) |
 
 Y notifica `AT+GUARDAR` (o `AT+GUARDARDOS` en el modo dos descargas) cuando una
 descarga hidráulica llega a su objetivo.
@@ -82,6 +84,7 @@ lib/
     st407_remote/
     manual/
     hidraulico_ble/
+    st567/
     shared/               lo que comparten dos o más protocolos
     simulator_protocol.dart   el contrato
     protocol_registry.dart
