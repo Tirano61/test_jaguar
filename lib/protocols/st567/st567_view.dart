@@ -5,9 +5,14 @@ import 'package:test_jaguar/presentation/widgets/hero_weight_card.dart';
 import 'package:test_jaguar/presentation/widgets/section_card.dart';
 import 'package:test_jaguar/presentation/widgets/simulator_scaffold.dart';
 import 'package:test_jaguar/protocols/st567/st567_screen.dart';
+import 'package:test_jaguar/protocols/st567/st567_state.dart';
 
 /// Pantalla del modo Remoto ST567: muestra en qué pantalla está el indicador
-/// simulado y deja saltar a las que no necesitan una corrida en curso.
+/// simulado y qué está haciendo, deja saltar a las pantallas que no necesitan
+/// una corrida en curso y fija cómo responde a algunos comandos.
+///
+/// La navegación real la hace la app con sus `CTR,<comando>`; esto es para
+/// forzar casos (un popup, un diálogo) sin tener que llegar a ellos.
 class St567View extends StatelessWidget {
   const St567View({required this.controller, super.key});
 
@@ -16,7 +21,9 @@ class St567View extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final SimulatorViewState state = controller.state;
-    final St567Screen actual = state.st567.screen;
+    final St567State st567 = state.st567;
+    final St567Screen actual = st567.screen;
+    final St567Options options = st567.options;
 
     return SimulatorScaffold(
       controller: controller,
@@ -32,6 +39,17 @@ class St567View extends StatelessWidget {
               Text(
                 'Notificando: ${actual.label}',
                 style: Theme.of(context).textTheme.titleMedium,
+              ),
+              if (st567.detalle.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 4),
+                Text(st567.detalle),
+              ],
+              const SizedBox(height: 4),
+              Text(
+                'Mixer: ${st567.totalCargado} kg · '
+                'Operario: ${st567.operario.isEmpty ? '-' : st567.operario} · '
+                'LevelLock: ${st567.levelLock ? 'ON' : 'OFF'}',
+                style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 8),
               DropdownButtonFormField<St567Screen>(
@@ -70,11 +88,51 @@ class St567View extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 4),
+        SectionCard(
+          title: 'Respuestas del indicador',
+          child: Column(
+            children: <Widget>[
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('Recetas con preset (firmware ≥ 1.36.3)'),
+                subtitle: const Text('elegirReceta responde 60 en vez de 30'),
+                value: options.recetasConPreset,
+                onChanged: (bool v) => controller.setSt567Options(
+                  options.copyWith(recetasConPreset: v),
+                ),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('La sincronización falla'),
+                subtitle: const Text('sync termina en 35 en vez de 36'),
+                value: options.sincronizacionFalla,
+                onChanged: (bool v) => controller.setSt567Options(
+                  options.copyWith(sincronizacionFalla: v),
+                ),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('Sin trabajos cargados'),
+                subtitle: const Text('elegirTrabajo responde el popup 20'),
+                value: options.sinTrabajos,
+                onChanged: (bool v) => controller.setSt567Options(
+                  options.copyWith(sinTrabajos: v),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
         HeroWeightCard(
           weight: state.weight,
           footer: Text(
             'Protocolo ST567 (remoto): cabecera binaria de 5 bytes y cadena '
-            'separada por coma, sobre el mismo perfil ABF3 que el ST407.',
+            'separada por coma, sobre el mismo perfil ABF3 que el ST407. En '
+            'las pantallas de peso se muestra lo que falta cargar o '
+            'descargar, como en la app.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Colors.white.withValues(alpha: 0.90),
                 ),

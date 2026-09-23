@@ -154,8 +154,13 @@ class St567Catalog {
         porcentaje: '100',
         viajes: '2',
         completo: false,
-        // Piden 1000 kg y se cargan 800: el segundo lote se queda sin carga.
-        lotes: <St567Lote>[St567Lote('Corral 3', 500), St567Lote('Corral 4', 500)],
+        // Piden 1000 kg y se cargan 800: después del segundo lote el mixer
+        // queda vacío y todavía falta el tercero.
+        lotes: <St567Lote>[
+          St567Lote('Corral 3', 500),
+          St567Lote('Corral 4', 300),
+          St567Lote('Corral 5', 200),
+        ],
       ),
       St567Trabajo(
         indice: '3',
@@ -166,7 +171,7 @@ class St567Catalog {
         porcentaje: '100',
         viajes: '1',
         completo: false,
-        lotes: <St567Lote>[St567Lote('Corral 5', 1200), St567Lote('Corral 6', 800)],
+        lotes: <St567Lote>[St567Lote('Corral 6', 1200), St567Lote('Corral 7', 800)],
       ),
       St567Trabajo(
         indice: '4',

@@ -75,6 +75,132 @@ class St567Payload {
     ]);
   }
 
+  /// Pantalla `2`: `total,parcial,kgACargar,nroIngrediente,ingrediente,lock,
+  /// level,sirena`.
+  static String cargaManual(
+    St567Pesaje pesaje, {
+    required String nroIngrediente,
+    required String ingrediente,
+  }) {
+    return frame(St567Screen.cargaManual, <Object>[
+      pesaje.total,
+      pesaje.parcial,
+      pesaje.objetivo,
+      nroIngrediente,
+      ingrediente,
+      ...pesaje.flags,
+    ]);
+  }
+
+  /// Pantalla `4`: `total,parcial,kgADescargar,lote,lock,level,sirena`.
+  static String descargaManual(St567Pesaje pesaje, {required String lote}) {
+    return frame(St567Screen.descargaManual, <Object>[
+      pesaje.total,
+      pesaje.parcial,
+      pesaje.objetivo,
+      lote,
+      ...pesaje.flags,
+    ]);
+  }
+
+  /// Pantalla `6`: `minutos,segundos`. Los segundos van sin rellenar: la app
+  /// los completa a dos dígitos.
+  static String mezclando(int segundosRestantes) {
+    return frame(St567Screen.mezclando, <Object>[
+      segundosRestantes ~/ 60,
+      segundosRestantes % 60,
+    ]);
+  }
+
+  /// Pantalla `19`: `porcentaje`, sin el signo (la app no lo agrega).
+  static String sincronizando(int porcentaje) {
+    return frame(St567Screen.sincronizando, <Object>[porcentaje]);
+  }
+
+  /// Pantalla `31`: `nombreTrabajo,nombreReceta,bachada,porcentaje,mezclaSeg,
+  /// nIng,nLotes,viajes,(ing,kg)*nIng,(lote,kg)*nLotes`.
+  static String detalleTrabajo(
+    St567Trabajo trabajo, {
+    required St567Receta receta,
+    required List<St567IngredienteReceta> ingredientes,
+  }) {
+    return frame(St567Screen.detalleTrabajo, <Object>[
+      trabajo.nombre,
+      receta.nombre,
+      trabajo.bachada,
+      trabajo.porcentaje,
+      receta.mezclaSeg,
+      ingredientes.length,
+      trabajo.lotes.length,
+      trabajo.viajes,
+      for (final St567IngredienteReceta i in ingredientes)
+        ...<Object>[i.nombre, i.cantidad],
+      for (final St567Lote l in trabajo.lotes) ...<Object>[l.nombre, l.kg],
+    ]);
+  }
+
+  /// Pantalla `37`: `nombre,mezclaSeg,tipo,n,(nombre,cantidad,tipoAviso,aviso,
+  /// mezclaSeg)*n`. Cada ingrediente lleva los cinco campos siempre: uno
+  /// truncado rompe el parseo en la app.
+  static String detalleReceta(St567Receta receta) {
+    return frame(St567Screen.detalleReceta, <Object>[
+      receta.nombre,
+      receta.mezclaSeg,
+      receta.tipo,
+      receta.ingredientes.length,
+      for (final St567IngredienteReceta i in receta.ingredientes)
+        ...<Object>[i.nombre, i.cantidad, i.tipoAviso, i.aviso, i.mezclaSeg],
+    ]);
+  }
+
+  /// Pantalla `38`: `total,parcial,kgACargar,ingredienteActual,lock,level,
+  /// sirena,n,(nombre,cantidad,tipoAviso,aviso,mezclaSeg,estado)*n`.
+  ///
+  /// `ingredienteActual` tiene que ser idéntico al `nombre` de la lista para
+  /// que la app resalte la tarjeta.
+  static String cargaReceta(
+    St567Pesaje pesaje, {
+    required String ingredienteActual,
+    required List<({St567IngredienteReceta ingrediente, bool cargado})> items,
+  }) {
+    return frame(St567Screen.cargaReceta, <Object>[
+      pesaje.total,
+      pesaje.parcial,
+      pesaje.objetivo,
+      ingredienteActual,
+      ...pesaje.flags,
+      items.length,
+      for (final item in items)
+        ...<Object>[
+          item.ingrediente.nombre,
+          item.ingrediente.cantidad,
+          item.ingrediente.tipoAviso,
+          item.ingrediente.aviso,
+          item.ingrediente.mezclaSeg,
+          _flag(item.cargado),
+        ],
+    ]);
+  }
+
+  /// Pantalla `39`: `total,parcial,kgADescargar,loteActual,lock,level,sirena,
+  /// n,(nombre,parcial,total)*n`.
+  static String descargaGuia(
+    St567Pesaje pesaje, {
+    required String loteActual,
+    required List<({String nombre, int descargado, int total})> lotes,
+  }) {
+    return frame(St567Screen.descargaGuia, <Object>[
+      pesaje.total,
+      pesaje.parcial,
+      pesaje.objetivo,
+      loteActual,
+      ...pesaje.flags,
+      lotes.length,
+      for (final lote in lotes)
+        ...<Object>[lote.nombre, lote.descargado, lote.total],
+    ]);
+  }
+
   /// Una pantalla con [campos] después del ID; sin campos sirve para los
   /// popups y los diálogos (`33`, `35`, `36`, `40`, `41`…).
   static String frame(St567Screen screen, [List<Object> campos = const <Object>[]]) {
@@ -89,4 +215,36 @@ class St567Payload {
     return '${two(value.day)}/${two(value.month)}/${value.year} '
         '${two(value.hour)}:${two(value.minute)}';
   }
+}
+
+/// Los campos que comparten las pantallas de peso (`2`, `4`, `38`, `39`):
+/// total del mixer, lo cargado o descargado en el paso actual, el objetivo del
+/// paso y los tres indicadores. La app calcula el peso grande como
+/// `objetivo - parcial`.
+class St567Pesaje {
+  const St567Pesaje({
+    required this.total,
+    required this.parcial,
+    required this.objetivo,
+    required this.lock,
+    required this.level,
+    required this.sirena,
+  });
+
+  final int total;
+
+  /// Entero obligatorio: la app hace `int.tryParse(...)!`.
+  final int parcial;
+
+  /// Entero obligatorio, igual que [parcial].
+  final int objetivo;
+  final bool lock;
+  final bool level;
+  final bool sirena;
+
+  List<String> get flags => <String>[
+        St567Payload._flag(lock),
+        St567Payload._flag(level),
+        St567Payload._flag(sirena),
+      ];
 }
