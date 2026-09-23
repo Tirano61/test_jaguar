@@ -16,6 +16,8 @@ import 'package:test_jaguar/protocols/shared/scale_automatisms.dart';
 import 'package:test_jaguar/protocols/simulator_protocol.dart';
 import 'package:test_jaguar/protocols/st407_remote/st407_remote_protocol.dart';
 import 'package:test_jaguar/protocols/st407_remote/st407_screen.dart';
+import 'package:test_jaguar/protocols/st567/st567_protocol.dart';
+import 'package:test_jaguar/protocols/st567/st567_screen.dart';
 
 class SimulatorOrchestrator {
   SimulatorOrchestrator({
@@ -54,6 +56,11 @@ class SimulatorOrchestrator {
   /// UI con otro protocolo activo, así que también se accede fuera de su modo.
   St407RemoteProtocol get _st407 =>
       _registry.of(SendProtocol.st407Remote) as St407RemoteProtocol;
+
+  /// El módulo Remoto ST567. Como el ST407, la pantalla se puede elegir desde
+  /// la UI con otro protocolo activo.
+  St567Protocol get _st567 =>
+      _registry.of(SendProtocol.st567) as St567Protocol;
 
   /// Congelado de peso y estabilidad. Una sola instancia compartida: el peso
   /// que congela sale del último emitido globalmente, no del protocolo activo.
@@ -112,6 +119,10 @@ class SimulatorOrchestrator {
       _st407.resetRunState();
     }
 
+    if (_sendProtocol != SendProtocol.st567) {
+      _st567.resetRunState();
+    }
+
     // Limpiar estado de ejecución hidráulico si ya no estamos en ese
     // protocolo (tomaFuerza/errorEcu se conservan, son configuración, no
     // estado de una corrida en curso).
@@ -123,6 +134,7 @@ class SimulatorOrchestrator {
       sendProtocol: _sendProtocol,
       bleUuids: _protocol.bleUuids,
       hidraulico: _hydraulic.state,
+      st567: _st567.state,
     ));
     _pushLog('Protocolo seleccionado: ${protocol.label}');
     await _sendCurrentPayloadNow();
@@ -188,6 +200,19 @@ class SimulatorOrchestrator {
 
     if (_sendProtocol == SendProtocol.st407Remote) {
       _st407.seedScreenState(currentPeso: _current.measurement.peso);
+      await _sendCurrentPayloadNow();
+    }
+  }
+
+  Future<void> setSt567Screen(St567Screen screen) async {
+    final String? log = _st567.goTo(screen);
+    if (log == null) {
+      return;
+    }
+    _emit(_current.copyWith(st567: _st567.state));
+    _pushLog(log);
+
+    if (_sendProtocol == SendProtocol.st567) {
       await _sendCurrentPayloadNow();
     }
   }
@@ -384,6 +409,7 @@ class SimulatorOrchestrator {
         st407Screen: _st407.screen,
         manualMeasurement: _manual.measurement,
         hidraulico: _hydraulic.state,
+        st567: _st567.state,
         weightHoldSecondsRemaining: weightHoldSecondsRemaining,
         lastJson: payload,
       ),
@@ -405,6 +431,12 @@ class SimulatorOrchestrator {
     }
 
     final ScaleMeasurement base = engine.copyWith(humedad: _selectedHumidity);
+
+    // El ST567 no usa los automatismos de balanza: su pantalla principal
+    // muestra el peso del motor tal cual, y la estabilidad la deduce el módulo.
+    if (_sendProtocol == SendProtocol.st567) {
+      return _st567.advance(base, log: _pushLog);
+    }
 
     // En las pantallas de carga del ST407 el peso lo anima el protocolo.
     if (_sendProtocol == SendProtocol.st407Remote && _st407.isLoadingScreen) {
