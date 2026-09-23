@@ -2,6 +2,7 @@ import 'package:test_jaguar/domain/entities/scale_measurement.dart';
 import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
 import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_state.dart';
 import 'package:test_jaguar/protocols/st407_remote/st407_screen.dart';
+import 'package:test_jaguar/protocols/st567/st567_state.dart';
 
 /// Lo que la UI necesita para dibujarse.
 ///
@@ -35,6 +36,7 @@ class SimulatorViewState {
     required this.manualTaraMax,
     required this.manualWeightMax,
     required this.hidraulico,
+    required this.st567,
   });
 
   // --- Comunes ---
@@ -72,6 +74,8 @@ class SimulatorViewState {
 
   final HydraulicState hidraulico;
 
+  final St567State st567;
+
   static const SimulatorViewState initial = SimulatorViewState(
     bleEnabled: false,
     advertising: false,
@@ -97,6 +101,7 @@ class SimulatorViewState {
     manualTaraMax: 22000,
     manualWeightMax: 22000,
     hidraulico: HydraulicState.initial,
+    st567: St567State.initial,
   );
 
   SimulatorViewState copyWith({
@@ -124,6 +129,7 @@ class SimulatorViewState {
     int? manualTaraMax,
     int? manualWeightMax,
     HydraulicState? hidraulico,
+    St567State? st567,
   }) {
     return SimulatorViewState(
       bleEnabled: bleEnabled ?? this.bleEnabled,
@@ -152,6 +158,7 @@ class SimulatorViewState {
       manualTaraMax: manualTaraMax ?? this.manualTaraMax,
       manualWeightMax: manualWeightMax ?? this.manualWeightMax,
       hidraulico: hidraulico ?? this.hidraulico,
+      st567: st567 ?? this.st567,
     );
   }
 }
