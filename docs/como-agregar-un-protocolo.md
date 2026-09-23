@@ -28,14 +28,14 @@ enum SendProtocol {
   st407Remote,
   manual,
   hidraulicoBle,
-  st567,          // <- nuevo
+  st456web,       // <- nuevo
   ;
 
   String get label {
     switch (this) {
       // ...
-      case SendProtocol.st567:
-        return 'Remoto ST567';
+      case SendProtocol.st456web:
+        return 'Remoto ST456web';
     }
   }
 }
@@ -44,17 +44,14 @@ enum SendProtocol {
 El `switch` del label es exhaustivo, así que el compilador te avisa. El selector
 de la UI se arma solo desde `SendProtocol.values`.
 
-> Con más de 5 protocolos el `SegmentedButton` de `ProtocolStatusHeader` no
-> entra a lo ancho. Conviene pasarlo a `Wrap` o a un `DropdownButton`.
-
 ### 2. Crear la carpeta del protocolo
 
-`lib/protocols/st567/st567_protocol.dart` implementando `SimulatorProtocol`:
+`lib/protocols/st456web/st456web_protocol.dart` implementando `SimulatorProtocol`:
 
 ```dart
-class St567Protocol implements SimulatorProtocol {
+class St456webProtocol implements SimulatorProtocol {
   @override
-  SendProtocol get id => SendProtocol.st567;
+  SendProtocol get id => SendProtocol.st456web;
 
   @override
   BleUuids get bleUuids => BleConstants.remotoAbf3;
@@ -82,7 +79,7 @@ convenciones que conviene seguir:
 * **Devolver `null` cuando no cambió nada.** Es lo que le dice al orquestador
   que no reenvíe el payload.
 
-Si tenés estado que la UI muestra, agregá un `st567_state.dart` con una clase
+Si tenés estado que la UI muestra, agregá un `st456web_state.dart` con una clase
 inmutable, como `HydraulicState`. Esa misma clase la usan el DTO y el
 `SimulatorViewState`, así que no hay que aplanarla dos veces.
 
@@ -96,15 +93,15 @@ importan Flutter. Sólo `*_view.dart` lo hace.
 ```dart
 return ProtocolRegistry(<SimulatorProtocol>[
   // ...
-  St567Protocol(),
+  St456webProtocol(),
 ]);
 ```
 
 `lib/presentation/pages/simulator_page.dart`:
 
 ```dart
-case SendProtocol.st567:
-  return St567View(controller: controller);
+case SendProtocol.st456web:
+  return St456webView(controller: controller);
 ```
 
 Ese `switch` es exhaustivo, así que **no compila** hasta que la vista exista. Y
@@ -127,37 +124,41 @@ Agregá tu familia de comandos ahí, delegando en tu módulo:
 
 ```dart
 if (_isMiComando(normalizedCommand)) {
-  if (_sendProtocol == SendProtocol.st567) {
-    await _applySt567Command(_st567.applyMiComando());
+  if (_sendProtocol == SendProtocol.st456web) {
+    await _applySt456webCommand(_st456web.applyMiComando());
   }
   return;
 }
 ```
 
-## Qué falta para ST456web y ST567
+## Si tu protocolo usa comandos `CTR,<comando>`
 
-Los dos documentos de protocolo están en `docs/protocolo-simulador-st456web.md`
-y `docs/protocolo-simulador-st567.md`. El perfil BLE y el framing ya están
-resueltos: comparten `BleConstants.remotoAbf3` y `PayloadFraming.fiveByteHeader`
-con el ST407, que es exactamente lo que ya soporta el simulador.
+Es la gramática de los indicadores remotos nuevos (ST567, ST456web). No pasa
+por la cadena de `AT+`: esa normalización pasa todo a mayúsculas y borra los
+espacios, y en los `CTR,` los argumentos (nombre de operario, lote) valen tal
+cual llegan. El orquestador los intercepta **antes** de normalizar.
 
-Faltan dos cosas, y ninguna es del refactor:
+El ST567 ya lo resuelve y sirve de modelo:
 
-**1. El lexer de comandos `CTR,<comando>`.** Hoy `_normalizeIncomingCommand`
-sólo reconoce la familia `AT+`. Los dos protocolos nuevos usan otra gramática
-—`CTR,sync`, `CTR,start,<kg>`, `CTR,select,<pos>`…, unos 22 comandos— que no
-comparte nada con la actual. Va a necesitar su propio parser; no intentes
-reusar la cadena de `AT+`.
+* `St567Command.tryParse` (`lib/protocols/st567/st567_command.dart`) separa
+  nombre y argumentos y deshace el escapado que aplica el datasource (`\s`
+  por el espacio, `\r`, `\n`, `\`, `\xNN`). Si el ST456web necesita lo mismo,
+  conviene moverlo a `protocols/shared/` en vez de copiarlo.
+* `St567Protocol.apply` es la máquina de estados: recibe el comando, decide la
+  pantalla que sigue según la pantalla vigente y devuelve la línea de log. Un
+  comando que no corresponde a la pantalla se loguea y no cambia nada.
+* `St567Protocol.advance` es el reloj: anima carga y descarga, corre la cuenta
+  regresiva de la mezcla y cierra los popups. `encodePayload` es puro.
 
-**2. El ritmo de envío.** Los docs piden repetir la pantalla actual cada
-**200–500 ms** en las pantallas de peso, para que la app la vea "viva". El
-motor de simulación tiene un tick de **1 segundo**
-(`SimulationTiming.oneMinutePerPhase`), que es el único reloj de la app. O se
-hace configurable por protocolo, o esos modos necesitan su propio timer.
+Sobre el ritmo de envío: los documentos piden repetir la pantalla cada
+**200–500 ms**, pero el motor tiene un tick de **1 segundo**
+(`SimulationTiming.oneMinutePerPhase`) y el ST567 lo usa tal cual. La app no
+tiene timeout de datos, así que alcanza; si hiciera falta más fluidez, hay que
+hacer el tick configurable por protocolo.
 
-Además, ojo con los códigos de pantalla: los dos documentos reservan `100`-`108`
-para el ST407 (que es lo que usa el simulador hoy) y `13` no se debe usar. El
-resto del rango `0`-`60` es de ellos.
+Ojo con los códigos de pantalla: los documentos reservan `100`-`108` para el
+ST407 y `13` no se debe usar. El resto del rango `0`-`60` es de los remotos
+nuevos.
 
 ## Cómo verificar
 

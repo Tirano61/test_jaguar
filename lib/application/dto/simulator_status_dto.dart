@@ -58,7 +58,7 @@ class SimulatorStatusDto {
   /// Hidráulico BLE: configuración de la caja y estado de la descarga.
   final HydraulicState hidraulico;
 
-  /// Remoto ST567: la pantalla que se está notificando.
+  /// Remoto ST567: pantalla, opciones y lo que está haciendo el indicador.
   final St567State st567;
 
   static const SimulatorStatusDto initial = SimulatorStatusDto(

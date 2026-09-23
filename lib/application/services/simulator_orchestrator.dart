@@ -16,8 +16,10 @@ import 'package:test_jaguar/protocols/shared/scale_automatisms.dart';
 import 'package:test_jaguar/protocols/simulator_protocol.dart';
 import 'package:test_jaguar/protocols/st407_remote/st407_remote_protocol.dart';
 import 'package:test_jaguar/protocols/st407_remote/st407_screen.dart';
+import 'package:test_jaguar/protocols/st567/st567_command.dart';
 import 'package:test_jaguar/protocols/st567/st567_protocol.dart';
 import 'package:test_jaguar/protocols/st567/st567_screen.dart';
+import 'package:test_jaguar/protocols/st567/st567_state.dart';
 
 class SimulatorOrchestrator {
   SimulatorOrchestrator({
@@ -217,6 +219,24 @@ class SimulatorOrchestrator {
     }
   }
 
+  /// Las opciones son configuración: se guardan aunque el protocolo activo
+  /// sea otro. No reenvían nada porque sólo cambian cómo se responde a los
+  /// próximos comandos, no la pantalla vigente.
+  Future<void> setSt567Options(St567Options options) async {
+    _pushLog(_st567.setOptions(options));
+    _emit(_current.copyWith(st567: _st567.state));
+  }
+
+  /// Publica el resultado de un comando `CTR,` y notifica la pantalla que
+  /// quedó. Todos los comandos reenvían, incluso los que no cambiaron nada:
+  /// repetir una trama es inofensivo para la app y así el tester ve la
+  /// respuesta en el log de envíos.
+  Future<void> _applySt567Command(String log) async {
+    _emit(_current.copyWith(st567: _st567.state));
+    _pushLog(log);
+    await _sendCurrentPayloadNow();
+  }
+
   Future<void> setManualMeasurement(ScaleMeasurement measurement) async {
     _manual.set(measurement);
     _emit(_current.copyWith(manualMeasurement: _manual.measurement));
@@ -380,6 +400,12 @@ class SimulatorOrchestrator {
       measurement = _manual.measurement;
     } else if (_sendProtocol == SendProtocol.hidraulicoBle) {
       measurement = _hydraulic.measurement(humidity: _selectedHumidity);
+    } else if (_sendProtocol == SendProtocol.st567) {
+      // _current.measurement puede traer el número grande de una pantalla de
+      // peso; el módulo sabe cuál es el peso de la balanza.
+      measurement = _st567.outgoing(
+        _current.measurement.copyWith(humedad: _selectedHumidity),
+      );
     } else {
       measurement = _current.measurement.copyWith(humedad: _selectedHumidity);
     }
@@ -459,6 +485,22 @@ class SimulatorOrchestrator {
 
   Future<void> _applyIncomingCommandIfNeeded(String? command) async {
     if (command == null || command.isEmpty) {
+      return;
+    }
+
+    // Los CTR, del ST567 van antes de normalizar: la normalización de los AT+
+    // pasa todo a mayúsculas y borra los espacios, y en los CTR, los
+    // argumentos (operario, lote) valen tal cual llegan.
+    final St567Command? ctr = St567Command.tryParse(command);
+    if (ctr != null) {
+      if (_sendProtocol == SendProtocol.st567) {
+        await _applySt567Command(_st567.apply(ctr));
+      } else {
+        _pushLog(
+          '${ctr.texto} recibido pero se ignora: seleccioná "Remoto ST567" '
+          'para procesarlo.',
+        );
+      }
       return;
     }
 
