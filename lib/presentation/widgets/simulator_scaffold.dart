@@ -106,7 +106,8 @@ class SimulatorScaffold extends StatelessWidget {
                 _BleIdentifiersCard(state: state),
                 const SizedBox(height: 4),
                 SectionCard(
-                  title: state.sendProtocol == SendProtocol.st407Remote
+                  title: state.sendProtocol == SendProtocol.st407Remote ||
+                          state.sendProtocol == SendProtocol.st567
                       ? 'Ultima cadena enviada'
                       : 'Ultimo JSON enviado',
                   child: Container(

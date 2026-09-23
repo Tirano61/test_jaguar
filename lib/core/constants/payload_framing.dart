@@ -11,6 +11,6 @@ enum PayloadFraming {
   /// Cabecera binaria de 5 bytes delante de cada parte: `idPaquete`,
   /// `totalPartes`, `numParte` y `longitud` (uint16 big-endian) del mensaje
   /// completo. La usan los protocolos remotos, que mandan cadenas separadas por
-  /// coma: el ST407 hoy, y el ST456web y el ST567 cuando se implementen.
+  /// coma: el ST407 y el ST567 hoy, y el ST456web cuando se implemente.
   fiveByteHeader,
 }

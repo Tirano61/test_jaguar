@@ -17,10 +17,17 @@ void main() {
     expect(registry.all, hasLength(SendProtocol.values.length));
   });
 
-  test('sólo el Remoto ST407 usa el perfil ABF3 y cabecera de 5 bytes', () {
-    final SimulatorProtocol st407 = registry.of(SendProtocol.st407Remote);
-    expect(st407.bleUuids, same(BleConstants.remotoAbf3));
-    expect(st407.framing, PayloadFraming.fiveByteHeader);
+  test('sólo los remotos ST407 y ST567 usan el perfil ABF3 y cabecera de 5 '
+      'bytes', () {
+    for (final SendProtocol id in <SendProtocol>[
+      SendProtocol.st407Remote,
+      SendProtocol.st567,
+    ]) {
+      expect(registry.of(id).bleUuids, same(BleConstants.remotoAbf3),
+          reason: '$id comparte el perfil del ST407');
+      expect(registry.of(id).framing, PayloadFraming.fiveByteHeader,
+          reason: '$id');
+    }
 
     for (final SendProtocol id in <SendProtocol>[
       SendProtocol.jaguarBle,

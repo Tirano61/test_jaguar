@@ -4,6 +4,7 @@ import 'package:test_jaguar/protocols/jaguar_ble/jaguar_ble_protocol.dart';
 import 'package:test_jaguar/protocols/manual/manual_protocol.dart';
 import 'package:test_jaguar/protocols/simulator_protocol.dart';
 import 'package:test_jaguar/protocols/st407_remote/st407_remote_protocol.dart';
+import 'package:test_jaguar/protocols/st567/st567_protocol.dart';
 
 /// Los protocolos que el simulador sabe hablar, indexados por su valor del
 /// enum.
@@ -30,6 +31,7 @@ class ProtocolRegistry {
       St407RemoteProtocol(),
       ManualProtocol(),
       HydraulicProtocol(),
+      St567Protocol(),
     ]);
   }
 
