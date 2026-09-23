@@ -30,22 +30,24 @@ class ProtocolStatusHeader extends StatelessWidget {
       children: <Widget>[
         SectionCard(
           title: 'Protocolo de envio',
-          child: SegmentedButton<SendProtocol>(
-            segments: SendProtocol.values
+          // Wrap en vez de SegmentedButton: con cinco protocolos los segmentos
+          // no entran a lo ancho en un teléfono.
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: SendProtocol.values
                 .map(
-                  (SendProtocol protocol) => ButtonSegment<SendProtocol>(
-                    value: protocol,
+                  (SendProtocol protocol) => ChoiceChip(
                     label: Text(protocol.label),
+                    selected: protocol == sendProtocol,
+                    onSelected: (bool selected) {
+                      if (selected && protocol != sendProtocol) {
+                        onProtocolChanged(protocol);
+                      }
+                    },
                   ),
                 )
                 .toList(),
-            selected: <SendProtocol>{sendProtocol},
-            onSelectionChanged: (Set<SendProtocol> selection) {
-              if (selection.isEmpty) {
-                return;
-              }
-              onProtocolChanged(selection.first);
-            },
           ),
         ),
         const SizedBox(height: 4),
