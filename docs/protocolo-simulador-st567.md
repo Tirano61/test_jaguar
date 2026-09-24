@@ -43,7 +43,7 @@ Pantallas que la app usa con el **ST567**:
 Pantallas que **no** son del ST567 pero la app también procesa (pertenecen al ST456web, ver `protocolo-simulador-st456web.md`):
 `1`, `3`, `8`, `9`, `10`, `11`, `12`, `14`, `15`, `18`. Si el ST567 las envía la app las muestra igual, pero el flujo ST567 usa `38`/`39`/`34`/`30`/`60` en su lugar.
 
-Pantallas reservadas que el simulador **no debe usar**: `13` (ignorada, muestra pantalla principal) y `100`–`108` (indicador ST407).
+Pantallas reservadas que el simulador **no debe usar**: `13` (ignorada, muestra pantalla principal) y `100`–`110` (indicador ST407).
 
 ---
 
@@ -666,7 +666,7 @@ app → CTR,esc                         sim → 0
 
 ### 10.2 Pantallas del ST407 (no usar con ST567)
 
-`100` principal, `101` carga por receta, `102` carga manual, `103` descarga por guía, `104` descarga manual, `105` mezclando, `106` elegir receta, `107` elegir autónomo, `108` elegir guía. Tienen otros modelos de datos.
+`100` principal, `101` carga por receta, `102` carga manual, `103` descarga por guía, `104` descarga manual, `105` cargando autónomo, `106` mezclando, `107` más mezcla (popup), `108` elegir receta, `109` elegir autónomo, `110` elegir guía. Tienen otros modelos de datos.
 
 ### 10.3 Versiones de firmware mencionadas en el repositorio
 

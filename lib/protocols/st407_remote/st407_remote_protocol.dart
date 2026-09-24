@@ -9,7 +9,7 @@ import 'package:test_jaguar/protocols/st407_remote/st407_screen.dart';
 /// Protocolo Remoto ST407: el único que no manda JSON.
 ///
 /// Notifica una cadena separada por coma por cada pantalla del indicador
-/// (códigos 100-108), sobre el perfil ABF3 y con cabecera binaria de 5 bytes.
+/// (códigos 100-110), sobre el perfil ABF3 y con cabecera binaria de 5 bytes.
 ///
 /// Tiene dos automatismos propios, ambos atados al ritmo de envío y no a un
 /// timer: en las pantallas de carga el peso mostrado baja de a 1 kg mientras
