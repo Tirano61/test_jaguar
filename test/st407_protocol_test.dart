@@ -55,9 +55,9 @@ void main() {
     final St407RemoteProtocol p = enPantalla(St407Screen.mixing);
 
     // Cada envío consume un segundo: no hay timer, el reloj lo mueve el envío.
-    expect(p.encodePayload(conPeso(1000)), '105,4,30\r\n');
-    expect(p.encodePayload(conPeso(1000)), '105,4,29\r\n');
-    expect(p.encodePayload(conPeso(1000)), '105,4,28\r\n');
+    expect(p.encodePayload(conPeso(1000)), '106,4,30\r\n');
+    expect(p.encodePayload(conPeso(1000)), '106,4,29\r\n');
+    expect(p.encodePayload(conPeso(1000)), '106,4,28\r\n');
   });
 
   test('la cuenta de mezclado se queda en 0:00', () {
@@ -66,8 +66,8 @@ void main() {
       p.encodePayload(conPeso(1000));
     }
 
-    expect(p.encodePayload(conPeso(1000)), '105,0,00\r\n');
-    expect(p.encodePayload(conPeso(1000)), '105,0,00\r\n');
+    expect(p.encodePayload(conPeso(1000)), '106,0,00\r\n');
+    expect(p.encodePayload(conPeso(1000)), '106,0,00\r\n');
   });
 
   test('resetRunState re-siembra la carga con el peso del próximo envío', () {

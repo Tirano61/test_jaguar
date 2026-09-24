@@ -46,15 +46,15 @@ void main() {
       );
       expect(
         await _payloadDePantalla(harness, St407Screen.chooseRecipe),
-        '106,1,0,1200\r\n',
+        '108,1,0,1200\r\n',
       );
       expect(
         await _payloadDePantalla(harness, St407Screen.chooseAutonomous),
-        '107,1,ADGF,15/05/2017,17/05/2017,Receta1,Guia1\r\n',
+        '109,1,ADGF,15/05/2017,17/05/2017,Receta1,Guia1\r\n',
       );
       expect(
         await _payloadDePantalla(harness, St407Screen.chooseGuide),
-        '108,1,DescNov\r\n',
+        '110,1,DescNov\r\n',
       );
       expect(
         await _payloadDePantalla(harness, St407Screen.main),
@@ -76,10 +76,10 @@ void main() {
         await _payloadDePantalla(harness, St407Screen.loadingManual),
         '102,1000,0,1000,1\r\n',
       );
-      // El DTO diría '105,1,23'.
+      // El DTO diría '106,1,23'.
       expect(
         await _payloadDePantalla(harness, St407Screen.mixing),
-        '105,4,30\r\n',
+        '106,4,30\r\n',
       );
     });
   });
@@ -120,21 +120,21 @@ void main() {
       final Harness harness = await _st407Harness();
       expect(
         await _payloadDePantalla(harness, St407Screen.mixing),
-        '105,4,30\r\n',
+        '106,4,30\r\n',
       );
 
       await harness.tickWith(peso: 1000);
-      expect(harness.lastPayload, '105,4,29\r\n');
+      expect(harness.lastPayload, '106,4,29\r\n');
       await harness.tickWith(peso: 1000);
-      expect(harness.lastPayload, '105,4,28\r\n');
+      expect(harness.lastPayload, '106,4,28\r\n');
 
       // Los segundos van con cero a la izquierda, los minutos no.
       for (int i = 0; i < 300; i++) {
         await harness.tickWith(peso: 1000);
       }
-      expect(harness.lastPayload, '105,0,00\r\n');
+      expect(harness.lastPayload, '106,0,00\r\n');
       await harness.tickWith(peso: 1000);
-      expect(harness.lastPayload, '105,0,00\r\n');
+      expect(harness.lastPayload, '106,0,00\r\n');
     });
 
     test('AT+CERO le roba un segundo a la cuenta regresiva', () async {
@@ -143,12 +143,12 @@ void main() {
 
       // AT+CERO fuera del modo manual emite una medición efímera en cero, y
       // ese envío pasa por el mismo formateador que decrementa el reloj. Sin
-      // el comando, el próximo tick daría 105,4,29.
+      // el comando, el próximo tick daría 106,4,29.
       await harness.receive('AT+CERO\r\n');
-      expect(harness.lastPayload, '105,4,29\r\n');
+      expect(harness.lastPayload, '106,4,29\r\n');
 
       await harness.tickWith(peso: 1000);
-      expect(harness.lastPayload, '105,4,28\r\n');
+      expect(harness.lastPayload, '106,4,28\r\n');
     });
   });
 

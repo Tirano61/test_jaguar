@@ -46,7 +46,7 @@ Notas de alcance:
 
 * Según el manual de usuario, **Carga Manual**, **Descarga Manual** y **LevelLock** son funciones del ST567. La app igual envía esos comandos (`CTR,cargaManual`, `CTR,descargaManual,…`, `CTR,levelLock`) porque el menú es el mismo; el simulador ST456web puede ignorarlos o responder. Las pantallas `2` y `4` existen desde la versión original ST456 y la app las muestra si llegan.
 * Pantallas que **no** son del ST456web pero la app también procesa (pertenecen al ST567, ver `protocolo-simulador-st567.md`): `30`, `31`, `32`, `33`, `34`, `37`, `38`, `39`, `40`, `41`, `60`.
-* Pantallas reservadas que el simulador **no debe usar**: `13` (ignorada) y `100`–`108` (indicador ST407).
+* Pantallas reservadas que el simulador **no debe usar**: `13` (ignorada) y `100`–`110` (indicador ST407).
 
 ---
 
@@ -634,7 +634,7 @@ app → CTR,esc                         sim → 0
 
 ### 10.3 Pantallas del ST407 (no usar)
 
-`100`–`108`. Tienen otros modelos de datos.
+`100`–`110`. Tienen otros modelos de datos.
 
 ### 10.4 Versiones de firmware mencionadas en el repositorio
 
