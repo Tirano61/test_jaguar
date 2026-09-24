@@ -156,7 +156,7 @@ Sobre el ritmo de envío: los documentos piden repetir la pantalla cada
 tiene timeout de datos, así que alcanza; si hiciera falta más fluidez, hay que
 hacer el tick configurable por protocolo.
 
-Ojo con los códigos de pantalla: los documentos reservan `100`-`108` para el
+Ojo con los códigos de pantalla: los documentos reservan `100`-`110` para el
 ST407 y `13` no se debe usar. El resto del rango `0`-`60` es de los remotos
 nuevos.
 
