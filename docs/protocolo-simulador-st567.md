@@ -1,13 +1,13 @@
 # Protocolo Remoto BLE – Indicador **ST567** (guía para el simulador)
 
-**Origen de la información:** análisis del código de la app `remoto_567_flutter` versión **5.0.0-beta+44**, rama `RemotoBLE`
+**Origen de la información:** análisis del código de la app `remoto_567_flutter` versión **5.0.5-beta+49**, rama `RemotoBLE`
 (`lib/provider/conexion/remoto_common_ble.dart`, `lib/provider/protocolos/st456_coma_parser.dart`,
 `lib/provider/stream_provider_remoto.dart`, `lib/models/**`, `lib/pages/**`, `lib/pages/remoto.dart`).
-**Fecha:** 14/09/2026.
+**Fecha:** 14/09/2026 · **Actualizado:** 24/09/2026 (operaciones paso a paso, detalle de guía, diálogos locales, máquina de estados y numeración ST407).
 
 > Todo lo que dice este documento sobre **formato de tramas, campos y comandos** sale directamente del código de la app y es exacto.
 > La **secuencia entre pantallas** (qué pantalla responde el indicador a cada comando) la decide el firmware del ST567, que no está en este
-> repositorio. Los flujos de la sección 8 son los que la app asume por el diseño de sus botones y por el historial del proyecto; el
+> repositorio. Los flujos de las secciones 8 y 9 son los que la app asume por el diseño de sus botones y por el historial del proyecto; el
 > simulador puede respetarlos o ajustarlos al comportamiento real del indicador.
 
 ---
@@ -21,9 +21,11 @@
 5. [Comportamiento general de la app](#5-comportamiento-general-de-la-app)
 6. [Tabla resumen de pantallas](#6-tabla-resumen-de-pantallas)
 7. [Detalle de cada pantalla](#7-detalle-de-cada-pantalla)
-8. [Flujos completos sugeridos](#8-flujos-completos-sugeridos)
-9. [Checklist y errores comunes](#9-checklist-y-errores-comunes)
-10. [Apéndice](#10-apéndice)
+8. [Operaciones completas paso a paso](#8-operaciones-completas-paso-a-paso)
+   * [8.2 Carga por receta](#82-carga-por-receta) · [8.3 Descarga por guía](#83-descarga-por-guía) · [8.4 Carga manual](#84-carga-manual) · [8.5 Descarga manual](#85-descarga-manual) · [8.6 Trabajos y detalle de trabajo](#86-trabajos-receta--guía-y-detalle-de-trabajo)
+9. [Máquina de estados del simulador](#9-máquina-de-estados-del-simulador)
+10. [Checklist y errores comunes](#10-checklist-y-errores-comunes)
+11. [Apéndice](#11-apéndice)
 
 ---
 
@@ -35,15 +37,16 @@ Pantallas que la app usa con el **ST567**:
 |---|---|
 | Peso / operación | `0`, `2`, `4`, `6`, `38`, `39` |
 | Listas / selección | `30`, `60`, `32`, `34`, `42` |
-| Detalles | `31`, `37` |
+| Detalles | `31` (trabajo: receta + lotes), `37` (receta). No hay detalle de guía propio: ver 7.18 |
 | Diálogos con botones | `33`, `35`, `36`, `40`, `41` |
 | Popups sin botones | `16`, `17`, `20`, `43`, `44`, `45` |
 | Sincronización | `19`, `35`, `36` |
+| Diálogos locales de la tablet (no son pantallas) | menú, descarga manual, INICIAR CARGA, SALIR, ACUMULAR, PIN: ver 7.19 |
 
 Pantallas que **no** son del ST567 pero la app también procesa (pertenecen al ST456web, ver `protocolo-simulador-st456web.md`):
 `1`, `3`, `8`, `9`, `10`, `11`, `12`, `14`, `15`, `18`. Si el ST567 las envía la app las muestra igual, pero el flujo ST567 usa `38`/`39`/`34`/`30`/`60` en su lugar.
 
-Pantallas reservadas que el simulador **no debe usar**: `13` (ignorada, muestra pantalla principal) y `100`–`110` (indicador ST407).
+Pantallas reservadas que el simulador **no debe usar**: `13` (ignorada, muestra pantalla principal) y `100`–`110` (indicador ST407, ver 11.2).
 
 ---
 
@@ -554,121 +557,417 @@ Sin campos (`<id>\r\n`). Vista: `popups.dart`. Se muestran con título "INFO" y 
 
 No tienen ESC: el simulador debe enviar otra pantalla (p. ej. `0`) para salir. `45` la envía el ST567 (≥ v1.31.0) mientras el operador está dentro de un menú local del indicador; al salir del menú vuelve a enviar `0`.
 
+### 7.18 Detalle de guía (el ST567 no tiene pantalla propia)
+
+En el ST567 **no existe** una pantalla "detalle de guía". Los datos de la guía (lotes y kg de cada uno) se ven en:
+
+* `31` – Detalle de trabajo: tarjetas `Lote : <nombre>` — `<kg> kg` (después de los ingredientes).
+* `39` – Descarga por guía: lista de lotes con descargado / total / faltan.
+
+Si el simulador quiere mostrar **sólo** la guía, puede usar la pantalla `18` del ST456web (la app la procesa con cualquier indicador) con `tipo = 2`:
+
+```
+18,2,Corrales A,Corrales A,0,0,2,Corral 1,1000,Corral 2,800\r\n
+```
+
+Peculiaridad: en tipo `2` el panel de guía muestra el campo `[2]` (nombreReceta), por eso el nombre de la guía va en `[2]` y en `[3]`. ESC → `CTR,esc`. El formato completo de `18` está en `protocolo-simulador-st456web.md`, sección 7.13. Es una opción de compatibilidad: el firmware ST567 real no la usa.
+
+### 7.19 Diálogos locales de la app (no son pantallas)
+
+Estos diálogos los abre la tablet **sin** que el indicador envíe nada. El simulador sólo ve el comando que sale al confirmar. Mientras un diálogo local está abierto la app sigue procesando tramas, así que conviene seguir refrescando la pantalla de fondo.
+
+| Diálogo | Dónde se abre | Campos / validación | Comando al confirmar | Cancelar |
+|---|---|---|---|---|
+| **Menú principal** ("Selección") | `0`, botón *menú* | Botones: Carga Manual, Carga Por Receta, Descarga Manual, Iniciar Trabajo, Seleccionar Operario, Buscar actualización | `CTR,cargaManual` · `CTR,elegirReceta` · (abre diálogo de descarga manual) · `CTR,elegirTrabajo` · `CTR,cambiarOperario` · (local, no envía nada) | cierra sin enviar |
+| **Descarga Manual** (desde el menú) | Menú → *Descarga Manual* | *Lote*: máx. 3 caracteres, **sin filtro** (acepta espacios, comas, letras con tilde). *Cantidad*: sólo dígitos, sin límite de largo, acepta `0`. Ambos no vacíos | `CTR,descargaManual,<lote>,<kg>` (con `trim()`) | cierra sin enviar. Si algún campo está vacío, Aceptar cierra **sin enviar** |
+| **INICIAR CARGA** (receta) | `30`/`60`, botón START | *Cantidad*: sólo dígitos, sin límite. En `60` se precarga con el preset | `CTR,select,<indice>,<cantidad>` | cierra sin enviar. Cantidad vacía → cierra sin enviar |
+| **INICIAR CARGA** (ingrediente) | `32`, botón START | *Cantidad*: sólo dígitos | `CTR,select,<indice>,<cantidad>` | idem |
+| **SALIR** – "¿Está seguro que desea salir?" | ESC en `2`, `4`, `38`, `39` | – | `CTR,esc` | no envía |
+| **ACUMULAR** – "¿Está seguro que desea pasar el ingrediente?" / "…el lote?" | ACUM en `2`, `4`, `38`, `39` | – | `CTR,acum,<operario>` (`2`, `38`, `39`) · `CTR,acum` (`4`) | no envía |
+| **Cambiar operario** – "¿Desea cambiar el operario de la tablet?" | Botón *Operario* de la barra en `2`, `38` | – | `CTR,cambiarOperario` | no envía |
+| **PIN del operario** | `42`, botón START | 4 dígitos, se compara con el `password` recibido | `CTR,esc` si coincide | – |
+
+Consecuencia para el simulador: los comandos con argumentos (`descargaManual`, `select`) **nunca llegan con campos vacíos** desde estos diálogos, pero el `<lote>` del menú puede traer caracteres raros; el simulador debe tolerarlo (o recortarlo) sin colgarse. `<kg>` puede ser `0` en la descarga manual del menú (descarga sin objetivo, ver 7.3).
+
 ---
 
-## 8. Flujos completos sugeridos
+## 8. Operaciones completas paso a paso
 
-Notación: `app →` comando que envía la app; `sim →` pantalla que debe notificar el simulador.
+Notación: `app →` comando que envía la app; `sim →` trama que debe notificar el simulador (se omite el `\r\n` final). "(repetir)" = volver a enviar la trama cada 200–500 ms con el peso actualizado.
 
-### 8.1 Reposo
+> Los **formatos** de cada trama son exactos (salen del código de la app). Las **reglas de negocio** de esta sección (cómo se calcula `total`, cuándo sonar la sirena, a qué pantalla se vuelve) son una propuesta coherente para el simulador; donde el firmware real haga otra cosa, manda el firmware.
+
+Datos de ejemplo usados en toda la sección:
+
+| Tipo | Datos |
+|---|---|
+| Receta 1 "Vacas Lecheras" | mezcla 120 s, tipo KG. Maiz 600 kg (aviso 10 %, mezcla 30 s) · Soja 300 kg (aviso 20 kg, mezcla 30 s) · Heno 900 kg (aviso 15 %, mezcla 60 s). Total 1800 kg. |
+| Guía "Corrales A" | Corral 1 → 1000 kg · Corral 2 → 800 kg. Total 1800 kg. |
+| Ingredientes sueltos | 1 Maiz · 2 Soja · 3 Heno · 4 Nucleo |
+| Operarios | Dario (1234) · Estevan (0000) · Claudio (4321) |
+| Trabajo 1 "Trabajo Manana" | receta 1 + guía "Corrales A", bachada 2, 100 %, 1 viaje |
+
+### 8.1 Reposo (pantalla principal)
 
 ```
-(conexión BLE)        sim → 0 cada 300 ms   (peso, estabilidad, fecha, levelLock)
-app → CTR,cero        sim → 0 con peso 0
-app → CTR,levelLock   sim → 0 con levelLock alternado (0/1)
+(conexión BLE)        sim → 0,0,1,kg,,24/09/2026 10:32,0              (repetir)
+(balanza se mueve)    sim → 0,1248,0,kg,,24/09/2026 10:32,0           punto rojo
+(balanza estable)     sim → 0,1250,1,kg,,24/09/2026 10:32,0           punto verde
+app → CTR,cero        sim → 0,0,1,kg,,24/09/2026 10:33,0
+app → CTR,levelLock   sim → 0,0,1,kg,,24/09/2026 10:33,1              líneas rojas
+app → CTR,levelLock   sim → 0,0,1,kg,,24/09/2026 10:33,0              líneas azules
 ```
+
+Estado que el simulador debe recordar en todo momento: **peso en el mixer**, **levelLock**, **lock**, **level** y la **pantalla actual** (para responder `esc`, `nextPage`, etc.).
 
 ### 8.2 Carga por receta
 
-```
-app → CTR,elegirReceta                sim → 60 (o 30 en firmware viejo)
-app → CTR,nextPage / prevPage         sim → 60 con otra página
-app → CTR,detail,2                    sim → 37 (detalle de la receta 2)
-app → CTR,esc                         sim → 60
-app → CTR,select,2,1500               sim → 38 (cargando 1er ingrediente), repetir cada 300 ms con el peso
-   … el peso sube; cuando falta el "aviso" → sirena=1 …
-app → CTR,acum,<operario>             sim → 38 (siguiente ingrediente, estado del anterior = 1)
-   … último ingrediente …
-app → CTR,acum,<operario>             sim → 6 (mezclando, cuenta regresiva) → luego 0   (o 39 si el trabajo sigue con descarga)
-app → CTR,esc (en cualquier momento)  sim → 0
-```
+**Reglas de cálculo sugeridas para `38`:**
 
-### 8.3 Carga manual
+| Campo | Cómo calcularlo |
+|---|---|
+| `kgACargar` | Objetivo del ingrediente actual = `cantidad del ingrediente × (cantidad pedida en select / total de la receta)`, redondeado a entero. Con `select,1,1800` el factor es 1. |
+| `parcial` | Kg cargados del ingrediente actual (peso actual − peso al empezar el ingrediente). **Entero.** |
+| `total` | Kg acumulados de todos los ingredientes ya pasados con ACUM + `parcial`. |
+| `ingredienteActual` | Nombre **idéntico** al de la lista, para que se resalte la tarjeta. |
+| `sirena` | `1` cuando lo que falta (`kgACargar − parcial`) ≤ aviso. Aviso = `aviso` kg si `tipoAviso = 0`, o `kgACargar × aviso / 100` si `tipoAviso = 1`. Volver a `0` al hacer ACUM. |
+| `estado` (por ingrediente) | `1` para los ya acumulados; `0` para el actual y los pendientes. |
+| lista | Siempre la receta completa, en el mismo orden, con los 6 campos por ingrediente. |
 
-```
-app → CTR,cargaManual                 sim → 32 (lista de ingredientes)      [o directamente 2]
-app → CTR,select,3,500                sim → 2 (cargando ingrediente 3, kgACargar 500), repetir con el peso
-app → CTR,acum,<operario>             sim → 32 (para elegir otro) o 0
-app → CTR,selectIngrediente           sim → 32
-app → CTR,esc                         sim → 0
-```
-
-### 8.4 Descarga manual
+**Secuencia:**
 
 ```
-app → CTR,descargaManual,L01,1000     sim → 4 (lote L01, kgADescargar 1000), repetir con el peso
-app → CTR,acum                        sim → 33 (pedir lote y cantidad)
-app → CTR,descargaManual,L02,800      sim → 4 (lote L02)
-app → CTR,esc                         sim → 0
+app → CTR,elegirReceta
+sim → 60,3,1,Vacas Lecheras,1800,2,Terneros,800,3,Engorde,2000
+      (firmware < 1.36.3: 30,3,1,Vacas Lecheras,2,Terneros,3,Engorde)
+
+   ── ver el detalle antes de empezar (opcional) ──
+app → CTR,detail,1
+sim → 37,Vacas Lecheras,120,0,3,Maiz,600,1,10,30,Soja,300,0,20,30,Heno,900,1,15,60
+app → CTR,esc
+sim → 60,3,1,Vacas Lecheras,1800,2,Terneros,800,3,Engorde,2000       (la misma página que estaba)
+
+   ── iniciar ──
+app → CTR,select,1,1800
+sim → 38,0,0,600,Maiz,0,0,0,3,Maiz,600,1,10,30,0,Soja,300,0,20,30,0,Heno,900,1,15,60,0
+      (repetir mientras el peso sube)
+sim → 38,300,300,600,Maiz,0,0,0,3,Maiz,600,1,10,30,0,Soja,300,0,20,30,0,Heno,900,1,15,60,0
+sim → 38,545,545,600,Maiz,0,0,1,3,Maiz,600,1,10,30,0,Soja,300,0,20,30,0,Heno,900,1,15,60,0   ← faltan 55 ≤ 60 (10 %): sirena
+sim → 38,600,600,600,Maiz,0,0,1,3,Maiz,600,1,10,30,0,Soja,300,0,20,30,0,Heno,900,1,15,60,0
+
+app → CTR,acum,Dario                                                   (pasa Maiz)
+sim → 38,600,0,300,Soja,0,0,0,3,Maiz,600,1,10,30,1,Soja,300,0,20,30,0,Heno,900,1,15,60,0
+sim → 38,885,285,300,Soja,0,0,1,…                                        ← faltan 15 ≤ 20 kg: sirena
+
+app → CTR,acum,Dario                                                   (pasa Soja)
+sim → 38,900,0,900,Heno,0,0,0,3,Maiz,600,1,10,30,1,Soja,300,0,20,30,1,Heno,900,1,15,60,0
+sim → 38,1680,780,900,Heno,0,0,1,…                                       ← faltan 120 ≤ 135 (15 %): sirena
+
+app → CTR,acum,Dario                                                   (último ingrediente)
+sim → 6,2,0 · 6,1,59 · … · 6,0,0                                        (mezcla de la receta: 120 s, una trama por segundo)
+sim → 0,1800,1,kg,,24/09/2026 10:40,0                                   (vuelve a reposo con el mixer cargado)
 ```
 
-### 8.5 Trabajos
+Variantes y casos especiales:
+
+| Situación | Qué hacer |
+|---|---|
+| `CTR,nextPage` / `CTR,prevPage` en `60`/`30` | Reenviar `60`/`30` con la página siguiente/anterior. En la última página `nextPage` puede reenviar la misma. |
+| `CTR,esc` en `60`/`30` | `0`. |
+| `CTR,esc` en `38` (el operador confirmó "Salir") | Cancelar la carga → `0` (lo cargado queda en el mixer). |
+| `CTR,esc` en `6` | Cortar la mezcla → `0`. |
+| `CTR,lock` / `CTR,level` en `38` | Alternar el flag y reenviar `38` con `lock`/`level` cambiado. |
+| `CTR,rotate` en `38` | Sin cambio de pantalla. |
+| `CTR,cambiarOperario` en `38` | `42`; tras `CTR,esc`, **volver a `38`** (la carga sigue). |
+| No hay operario en el indicador | `16` y luego `0` (el ST567 exige operario para cargar). |
+| Mezcla por ingrediente (`mezcla` > 0 en el ingrediente) | Opcional: después del ACUM de ese ingrediente mandar `6` con esos segundos y después `38` con el siguiente. |
+| `CTR,acum,` (operario vacío) | Aceptarlo igual: la tablet puede no tener operario elegido. |
+
+### 8.3 Descarga por guía
+
+La descarga por guía se hace dentro de un **trabajo** (8.5): después de la carga y la mezcla el indicador pasa a `39`. El menú de la app no tiene un botón "descarga por guía" para el ST567.
+
+**Reglas de cálculo sugeridas para `39`:**
+
+| Campo | Cómo calcularlo |
+|---|---|
+| `kgADescargar` | Objetivo del lote actual (`total` del lote en la lista). **Entero.** |
+| `parcial` | Kg descargados del lote actual (peso al empezar el lote − peso actual). **Entero.** |
+| `total` | Kg descargados acumulados de toda la guía (lotes ya pasados + `parcial`). |
+| `loteActual` | Nombre **idéntico** al de la lista (borde naranja + check). |
+| `sirena` | `1` cuando falta poco para el objetivo del lote (el ST567 no manda aviso por lote; usar por ejemplo 5 %). |
+| lista (por lote) | `nombre`, `parcial` = kg descargados en ese lote (acumulado), `total` = kg a descargar en ese lote. Lotes pendientes con `parcial = 0`. Un lote con `parcial ≥ total` se dibuja como completo (caja). Si `parcial > total` la app muestra `Sobran: … kg` en rojo. |
+
+> Así el número grande (`kgADescargar − parcial`) es lo que falta del lote actual, igual que en la carga. El *mock* que dejó el desarrollador en la página (`39,7800,3250,8000,Lote 3,…`) usa otra convención (acumulados de toda la guía); la app acepta las dos, sólo cambia lo que ve el operador.
+
+**Secuencia:**
 
 ```
-app → CTR,elegirTrabajo               sim → 34 (o 20 si no hay trabajos)
-app → CTR,detail,1                    sim → 31
-app → CTR,esc                         sim → 34
-app → CTR,select,1                    sim → 41 "¿Reanudar trabajo?"  (opcional, si había uno pendiente)
-app → CTR,boton1 | CTR,boton2         sim → 38 (etapa de carga)
-   … carga como en 8.2 …
-app → CTR,acum,<operario> (último)    sim → 6 → 39 (etapa de descarga por lotes)
-app → CTR,acum,<operario>             sim → 39 (siguiente lote)   [o 40 "Debe preparar más carga"]
-app → CTR,boton1 / boton2 (desde 40)  sim → 39 o 0
-   … último lote …                    sim → 0
+(viene de 6 después de cargar la receta del trabajo, mixer con 1800 kg)
+sim → 39,0,0,1000,Corral 1,0,0,0,2,Corral 1,0,1000,Corral 2,0,800
+sim → 39,400,400,1000,Corral 1,0,0,0,2,Corral 1,400,1000,Corral 2,0,800         (repetir)
+sim → 39,960,960,1000,Corral 1,0,0,1,2,Corral 1,960,1000,Corral 2,0,800         ← sirena
+sim → 39,1000,1000,1000,Corral 1,0,0,1,2,Corral 1,1000,1000,Corral 2,0,800
+
+app → CTR,acum,Dario                                                            (pasa Corral 1)
+sim → 39,1000,0,800,Corral 2,0,0,0,2,Corral 1,1000,1000,Corral 2,0,800
+sim → 39,1500,500,800,Corral 2,0,0,0,2,Corral 1,1000,1000,Corral 2,500,800
+
+app → CTR,acum,Dario                                                            (último lote)
+sim → 0,0,1,kg,,24/09/2026 10:55,0                                               (trabajo terminado; en 34 queda completo = 1)
 ```
 
-### 8.6 Sincronización
+Variantes:
+
+| Situación | Qué hacer |
+|---|---|
+| Al pasar a un lote, el mixer no tiene suficiente para lo que falta de la guía | `40` "Debe preparar más carga". `CTR,boton1` (CONTINUAR) → seguir en `39` descargando lo que hay; `CTR,boton2` (NUEVA) → volver a cargar la receta del trabajo (`38`) y después seguir la guía donde quedó; `CTR,esc` → `0`. |
+| `CTR,esc` en `39` | Cancelar → `0`. Si el trabajo se reanuda desde `34`, el indicador puede ofrecer `41`. |
+| `CTR,lock` / `CTR,level` / `CTR,rotate` | Igual que en `38`. |
+| Sólo se quieren ver los lotes | Detalle de trabajo `31` (8.5) o, opcionalmente, `18` tipo `2` (7.18). |
+
+### 8.4 Carga manual
+
+**Reglas de cálculo sugeridas para `2`:**
+
+| Campo | Cómo calcularlo |
+|---|---|
+| `kgACargar` | `<kg>` recibido en `CTR,select,<indice>,<kg>`. **Entero.** |
+| `parcial` | Kg cargados del ingrediente actual. **Entero.** |
+| `total` | Kg acumulados en toda la carga manual (ingredientes ya pasados + `parcial`). |
+| `nroIngrediente` / `ingrediente` | Índice y nombre del ingrediente elegido en `32`. |
+| `sirena` | Opcional, p. ej. cuando faltan ≤ 10 % de `kgACargar`. |
+
+**Secuencia:**
 
 ```
-app → CTR,sync                        sim → 19,0 … 19,50 … 19,100  (opcional)
-                                      sim → 36 (o 35)
-app → CTR,esc                         sim → 0
+app → CTR,cargaManual
+sim → 32,4,1,Maiz,2,Soja,3,Heno,4,Nucleo
+
+app → CTR,select,2,500
+sim → 2,0,0,500,2,Soja,0,0,0
+sim → 2,250,250,500,2,Soja,0,0,0                     (repetir)
+sim → 2,460,460,500,2,Soja,0,0,1                     ← faltan 40: sirena
+
+app → CTR,acum,Dario                                  (pasa Soja)
+sim → 32,4,1,Maiz,2,Soja,3,Heno,4,Nucleo             (elegir el siguiente)
+
+app → CTR,select,1,300
+sim → 2,500,0,300,1,Maiz,0,0,0                       (total arrastra los 500 anteriores)
+   …
+app → CTR,esc  (en 2, tras confirmar "Salir")
+sim → 0,800,1,kg,,24/09/2026 11:05,0
 ```
 
-### 8.7 Cambio de operario
+Variantes:
+
+| Situación | Qué hacer |
+|---|---|
+| `CTR,selectIngrediente` en `2` (cambiar de ingrediente sin acumular) | `32`. Sugerido: lo cargado del ingrediente anterior sin ACUM no se registra. Después de `select` volver a `2`. |
+| `CTR,esc` en `32` | Si todavía no se cargó nada → `0`; si se venía de `2` → volver a `2`. |
+| `CTR,nextPage` / `CTR,prevPage` en `32` | Reenviar `32` con otra página. |
+| Indicador sin lista de ingredientes | Mandar directamente `2,0,0,0,,,0,0,0` (la app muestra 0 y los nombres vacíos). |
+| `CTR,cambiarOperario` en `2` | `42`; tras `CTR,esc` volver a `2`. |
+
+### 8.5 Descarga manual
 
 ```
-app → CTR,cambiarOperario             sim → 42 con la lista de usuarios y PIN
-   (validación local del PIN)
-app → CTR,esc                         sim → 0
+(en 0, el operador abre Menú → Descarga Manual, escribe L01 y 1000)
+app → CTR,descargaManual,L01,1000
+sim → 4,1800,0,1000,L01,0,0,0
+sim → 4,1800,400,1000,L01,0,0,0                      (repetir; peso grande = 600)
+sim → 4,1800,1000,1000,L01,0,0,1                     ← objetivo alcanzado: sirena (opcional)
+
+app → CTR,acum                                        (pasa L01; sin operario)
+sim → 33                                              (la app pide lote y cantidad)
+
+app → CTR,descargaManual,L02,800
+sim → 4,1800,0,800,L02,0,0,0
+   …
+app → CTR,esc  (en 4, tras confirmar "Salir")
+sim → 0,0,1,kg,,24/09/2026 11:20,0
 ```
 
-### 8.8 Indicador ocupado
+Reglas sugeridas para `4`: `total` = kg que tenía el mixer al empezar la descarga (la etiqueta es `Total :`; también puede usarse "descargado acumulado"), `parcial` = descargado del lote actual, `kgADescargar` = `<kg>` pedido.
+
+Variantes:
+
+| Situación | Qué hacer |
+|---|---|
+| `CTR,descargaManual,L01,0` (kg = 0) | Descarga sin objetivo: `4,1800,300,0,L01,0,0,0` → la app muestra `300` (lo descargado). |
+| `CTR,esc` en `33` | `0` (termina la descarga manual). |
+| `CTR,acum` y no hay más para descargar | `0` directamente, sin pasar por `33`. |
+| `<lote>` con caracteres raros (sólo desde el menú) | Tolerarlo; el diálogo `33` sí filtra a alfanumérico. |
+
+### 8.6 Trabajos (receta + guía) y detalle de trabajo
 
 ```
-(operador entra a un menú del indicador)   sim → 45
-(operador sale del menú)                   sim → 0
+app → CTR,elegirTrabajo
+sim → 34,3,1,Trabajo Manana,0,2,Trabajo Tarde,0,3,Trabajo Noche,1      (o 20 si no hay trabajos → luego 0)
+
+   ── ver el detalle (opcional) ──
+app → CTR,detail,1
+sim → 31,Trabajo Manana,Vacas Lecheras,2,100,120,3,2,1,Maiz,600,Soja,300,Heno,900,Corral 1,1000,Corral 2,800
+app → CTR,esc
+sim → 34,3,1,Trabajo Manana,0,2,Trabajo Tarde,0,3,Trabajo Noche,1
+
+   ── iniciar ──
+app → CTR,select,1
+      (si el trabajo había quedado a medias)  sim → 41 → app → CTR,boton1 (continuar donde quedó) | CTR,boton2 (reiniciar desde el 1er ingrediente)
+      (si el indicador no tiene operario)     sim → 16 → luego 34
+      (si la carga ya estaba hecha)           sim → 17 → luego 39
+sim → 38,0,0,600,Maiz,0,0,0,3,Maiz,600,1,10,30,0,Soja,300,0,20,30,0,Heno,900,1,15,60,0
+   … carga igual que 8.2 …
+app → CTR,acum,Dario (último ingrediente)
+sim → 6,2,0 … 6,0,0
+sim → 39,0,0,1000,Corral 1,0,0,0,2,Corral 1,0,1000,Corral 2,0,800
+   … descarga igual que 8.3 …
+app → CTR,acum,Dario (último lote)
+sim → 0                                  (y en la próxima 34 el trabajo 1 va con completo = 1)
 ```
+
+Notas:
+
+* `31` es el **único detalle de trabajo**: lleva receta (ingredientes) y guía (lotes) juntos. El detalle de receta suelto es `37` (desde `30`/`60`). No hay detalle de guía propio (7.18).
+* En `31` los ingredientes y lotes llevan los kg **del trabajo** (ya multiplicados por bachada/porcentaje), a diferencia de `37`, que lleva los kg base de la receta.
+* `CTR,select,<indice>` en `34` manda el `indice` del trabajo (no la posición en la página, a diferencia del ST456web). Si el operador no tocó ninguna fila se envía `1`.
+* Paginación: 15 trabajos por página como máximo.
+
+### 8.7 Sincronización
+
+```
+app → CTR,sync
+sim → 19,0 · 19,25 · 19,50 · 19,75 · 19,100          (opcional)
+sim → 36                                              (o 35 si falló)
+app → CTR,esc                                         (botón OK o ESC)
+sim → 0
+```
+
+`CTR,esc` durante `19` → cortar la sincronización y enviar `35` o `0`.
+
+### 8.8 Cambio de operario
+
+```
+app → CTR,cambiarOperario
+sim → 42,3,Dario,1234,Estevan,0000,Claudio,4321
+   (el operador elige "Dario", escribe 1234; la app valida localmente)
+app → CTR,esc
+sim → 0            (o la pantalla desde la que se pidió: 2 o 38)
+```
+
+Si el PIN está mal la app no envía nada y sigue en `42`. `43`/`44` no hacen falta.
+
+### 8.9 Indicador ocupado
+
+```
+(operador entra a un menú local del indicador)   sim → 45        (la app cierra el menú si estaba abierto)
+(operador sale del menú)                          sim → 0
+```
+
+Mientras está en `45` el simulador puede ignorar los comandos que lleguen (no debería llegar ninguno: la pantalla no tiene botones salvo *Desconectar*, que corta el BLE).
 
 ---
 
-## 9. Checklist y errores comunes
+## 9. Máquina de estados del simulador
+
+Resumen de **qué responder a cada comando según la pantalla actual**. Un comando que no aparece para una pantalla se puede ignorar (reenviar la pantalla actual).
+
+| Pantalla actual | Comando | Respuesta sugerida |
+|---|---|---|
+| `0` | `sync` | `19…` → `36`/`35` |
+| `0` | `levelLock` | `0` con levelLock alternado |
+| `0` | `cero` | `0` con peso 0 |
+| `0` | `cargaManual` | `32` (o `2` directo) |
+| `0` | `elegirReceta` | `60` (o `30`) |
+| `0` | `descargaManual,<lote>,<kg>` | `4` |
+| `0` | `elegirTrabajo` | `34` (o `20` → `0`) |
+| `0` | `cambiarOperario` | `42` |
+| `30`/`60` | `nextPage`/`prevPage` | `30`/`60` con otra página |
+| `30`/`60` | `detail,<i>` | `37` |
+| `30`/`60` | `select,<i>,<kg>` | `38` (o `16`) |
+| `30`/`60` | `esc` | `0` |
+| `37` | `esc` | `30`/`60` (la que estaba) |
+| `38` | `acum,<op>` | `38` siguiente ingrediente · último → `6` → `0` (o `39` en trabajo) |
+| `38` | `lock`/`level` | `38` con el flag alternado |
+| `38` | `rotate` | nada |
+| `38` | `cambiarOperario` | `42` → (esc) → `38` |
+| `38` | `esc` | `0` |
+| `6` | `esc` | `0` (o `39` en trabajo) |
+| `32` | `nextPage`/`prevPage` | `32` con otra página |
+| `32` | `select,<i>,<kg>` | `2` |
+| `32` | `esc` | `0` (o `2` si venía de `2`) |
+| `2` | `acum,<op>` | `32` (o `0`) |
+| `2` | `selectIngrediente` | `32` |
+| `2` | `lock`/`level` | `2` con el flag alternado |
+| `2` | `cambiarOperario` | `42` → (esc) → `2` |
+| `2` | `esc` | `0` |
+| `4` | `acum` | `33` (o `0`) |
+| `4` | `lock`/`level` | `4` con el flag alternado |
+| `4` | `esc` | `0` |
+| `33` | `descargaManual,<lote>,<kg>` | `4` |
+| `33` | `esc` | `0` |
+| `34` | `nextPage`/`prevPage` | `34` con otra página |
+| `34` | `detail,<i>` | `31` |
+| `34` | `select,<i>` | `41` / `16` / `17` / `38` |
+| `34` | `esc` | `0` |
+| `31` | `esc` | `34` |
+| `41` | `boton1` / `boton2` / `esc` | `38` o `39` donde quedó / `38` desde el inicio / `34` |
+| `39` | `acum,<op>` | `39` siguiente lote · `40` · último → `0` |
+| `39` | `lock`/`level`/`rotate` | igual que `38` |
+| `39` | `esc` | `0` |
+| `40` | `boton1` / `boton2` / `esc` | `39` / `38` / `0` |
+| `19` | `esc` | `35` o `0` |
+| `35`/`36` | `esc` | `0` |
+| `42` | `esc` | pantalla anterior (`0`, `2` o `38`) |
+| `16`, `17`, `20`, `43`, `44`, `45` | (no hay comandos) | el simulador sale solo enviando otra pantalla |
+
+---
+
+## 10. Checklist y errores comunes
 
 * [ ] Cabecera de 5 bytes en **cada** notificación; en una sola parte, `longitud` = bytes del payload incluidos `\r\n` (si no coincide, la trama se descarta en silencio).
 * [ ] `numParte` empieza en **1**; `idPaquete` distinto para cada trama lógica.
 * [ ] Payload termina en `\r\n` **una sola vez**, al final de la última parte.
 * [ ] Sin espacios después de las comas; sin comas dentro de los nombres.
 * [ ] Campos **int** (`parcial`, `kgACargar`, `kgADescargar` en `2`, `38`, `39`) siempre enteros; si no, la pantalla no se actualiza.
-* [ ] Listas: enviar exactamente los campos por ítem indicados (2 en `30`/`32`/`34`… salvo `34` que lleva 3; 3 en `60` y `39`; 5 en `37`; 6 en `38`). Un ítem truncado rompe el parseo.
+* [ ] Listas: enviar exactamente los campos por ítem indicados (2 en `30`/`32`/`42`; 3 en `34`, `60` y `39`; 5 en `37`; 6 en `38`; pares en `31`). Un ítem truncado rompe el parseo.
 * [ ] `34`: máximo 15 trabajos por página; `60`: máximo 30 recetas.
 * [ ] `38`/`39`: el `ingredienteActual`/`loteActual` debe coincidir **exactamente** (mayúsculas, espacios) con el `nombre` de la lista para que se resalte.
+* [ ] `31`: `cantIngredientes` y `cantLotes` deben coincidir con los pares enviados.
 * [ ] Refrescar la pantalla de peso periódicamente; no hay polling desde la app.
 * [ ] Después de un popup sin botones (`16`, `17`, `20`, `43`, `44`, `45`) enviar otra pantalla para salir.
+* [ ] Tolerar `CTR,acum,` con operario vacío y `<lote>` con caracteres raros desde el menú.
 * [ ] Codificación Latin-1/ASCII, no UTF-8 multibyte.
 
 ---
 
-## 10. Apéndice
+## 11. Apéndice
 
-### 10.1 Etiquetas que muestra la app (idioma español)
+### 11.1 Etiquetas que muestra la app (idioma español)
 
-`Total : `, `Parcial : `, `Kg a Cargar: `, `Kg a Descargar:  `, `Nº Ingrediente: `, `Nombre:`, `Cargando : `, `Descargando Lote: `, `Progreso de Carga`, `Progreso de Descarga`, `Fecha`, `OPERARIO`, `LISTA INGREDIENTES`, `LISTA LOTES`, `Mezclando`, `Sincronizando Indicador`, `Seleccionar Trabajo`, `Seleccionar Receta`, `Seleccionar Ingrediente`, `CAMBIO DE OPERARIO`.
+`Total : `, `Parcial : `, `Kg a Cargar: `, `Kg a Descargar:  `, `Nº Ingrediente: `, `Nombre:`, `Cargando : `, `Descargando Lote: `, `Progreso de Carga`, `Progreso de Descarga`, `Fecha`, `OPERARIO`, `LISTA INGREDIENTES`, `LISTA LOTES`, `Mezclando`, `Sincronizando Indicador`, `Seleccionar Trabajo`, `Seleccionar Receta`, `Seleccionar Ingrediente`, `CAMBIO DE OPERARIO`, `INICIAR CARGA`, `Cantidad`, `SALIR`, `ACUMULAR`, `¿Está seguro que desea salir?`, `¿Está seguro que desea pasar el ingrediente?`.
 
-### 10.2 Pantallas del ST407 (no usar con ST567)
+### 11.2 Pantallas del ST407 (no usar con ST567)
 
-`100` principal, `101` carga por receta, `102` carga manual, `103` descarga por guía, `104` descarga manual, `105` cargando autónomo, `106` mezclando, `107` más mezcla (popup), `108` elegir receta, `109` elegir autónomo, `110` elegir guía. Tienen otros modelos de datos.
+Numeración vigente desde la versión 5.0.4 de la app (commit "Se cambiaron los números de pantallas para igualarlo al indicador"):
 
-### 10.3 Versiones de firmware mencionadas en el repositorio
+| ID | Pantalla ST407 |
+|---|---|
+| `100` | Principal |
+| `101` | Carga por receta |
+| `102` | Carga manual |
+| `103` | Descarga por guía |
+| `104` | Descarga manual |
+| `105` | (no existe: "cargando autónomo") |
+| `106` | Mezclando |
+| `107` | "Más mezcla" – popup del indicador, la app **no** lo procesa (muestra la principal sin datos) |
+| `108` | Elegir receta |
+| `109` | Elegir autónomo |
+| `110` | Elegir guía |
+
+Tienen otros modelos de datos y usan comandos `FCN,cargarManual,<kg>`, `FCN,descargarManual,<lote>,<kg>` y `CTR,nextId`, que el ST567 no recibe.
+
+### 11.3 Versiones de firmware mencionadas en el repositorio
 
 | Función | ST567 |
 |---|---|
