@@ -119,7 +119,23 @@ class St567Protocol implements SimulatorProtocol {
   /// Carga por receta, sola o como parte de un trabajo.
   _Corrida? _corrida;
 
+  /// Lo cargado con ACUM desde que se entró a la carga manual: el `total` de
+  /// la `2`.
+  int _cargadoManual = 0;
+
+  /// Kilos que tenía el mixer al empezar la descarga manual: el `total` de la
+  /// `4`, que no cambia al pasar de un lote a otro.
+  int _mixerAlDescargar = 0;
+
+  /// La `32` se abrió desde la `2` para cambiar de ingrediente: su ESC vuelve
+  /// a la carga en vez de a la principal.
+  bool _ingredienteDesdeCarga = false;
+
   int _segundosMezcla = 0;
+
+  /// La mezcla en curso es la de un ingrediente, no la del final de la
+  /// receta: al terminar sigue la carga.
+  bool _mezclaIntermedia = false;
   int _porcentajeSync = 0;
 
   // --- Trabajos ---
@@ -201,7 +217,9 @@ class St567Protocol implements SimulatorProtocol {
         'recetas ${options.recetasConPreset ? 'con preset (60)' : 'sin preset (30)'}, '
         'sincronización ${options.sincronizacionFalla ? 'falla' : 'exitosa'}, '
         '${options.sinTrabajos ? 'sin trabajos' : 'con trabajos'}, '
-        '${options.sinOperario ? 'sin operario' : 'con operario'}';
+        '${options.sinOperario ? 'sin operario' : 'con operario'}, '
+        'mezcla ${options.mezclaPorIngrediente ? 'por ingrediente' : 'al final'}, '
+        '${options.sinListaIngredientes ? 'sin' : 'con'} lista de ingredientes';
   }
 
   /// Descarta la sesión al salir del modo. Las opciones se conservan: son
@@ -218,6 +236,10 @@ class St567Protocol implements SimulatorProtocol {
     _totalCargado = 0;
     _parcial = 0;
     _corrida = null;
+    _cargadoManual = 0;
+    _mixerAlDescargar = 0;
+    _ingredienteDesdeCarga = false;
+    _mezclaIntermedia = false;
     _pausadas.clear();
     _trabajoPorReanudar = null;
     _volverDeOperario = St567Screen.principal;
@@ -312,7 +334,7 @@ class St567Protocol implements SimulatorProtocol {
       'sync' => _sync(),
       'levellock' => _toggleLevelLock(),
       'cero' => _hacerCero(),
-      'cargamanual' => _desdePrincipal(St567Screen.elegirIngrediente),
+      'cargamanual' => _cargaManual(),
       'elegirreceta' => _desdePrincipal(_options.recetasConPreset
           ? St567Screen.elegirRecetaPreset
           : St567Screen.elegirReceta),
@@ -375,6 +397,24 @@ class St567Protocol implements SimulatorProtocol {
     return 'Comando aplicado -> ${destino.label}';
   }
 
+  String? _cargaManual() {
+    if (_screen != St567Screen.principal) {
+      return null;
+    }
+    _cargadoManual = 0;
+    _ingredienteDesdeCarga = false;
+    if (_options.sinListaIngredientes) {
+      _ingrediente = null;
+      _kgACargar = 0;
+      _parcial = 0;
+      _entrar(St567Screen.cargaManual);
+      return 'Comando aplicado: sin lista de ingredientes -> '
+          '${St567Screen.cargaManual.label}';
+    }
+    _entrar(St567Screen.elegirIngrediente);
+    return 'Comando aplicado -> ${St567Screen.elegirIngrediente.label}';
+  }
+
   String? _descargaManual(St567Command command) {
     if (_screen != St567Screen.principal &&
         _screen != St567Screen.loteYCantidad) {
@@ -385,6 +425,9 @@ class St567Protocol implements SimulatorProtocol {
     if (lote.isEmpty || kg == null) {
       return 'CTR,descargaManual necesita lote y cantidad: '
           '"${command.texto}" se ignora';
+    }
+    if (_screen == St567Screen.principal) {
+      _mixerAlDescargar = _totalCargado;
     }
     _lote = lote;
     _kgADescargar = kg;
@@ -430,7 +473,12 @@ class St567Protocol implements SimulatorProtocol {
         _entrar(_volverDeOperario);
       case St567Screen.detalleGuia:
         _entrar(_volverDeGuia, mantenerPagina: true);
-      case St567Screen.mezclando when _corrida?.trabajo != null:
+      case St567Screen.elegirIngrediente when _ingredienteDesdeCarga:
+        // Se arrepintió de cambiar de ingrediente: sigue con el que tenía.
+        _ingredienteDesdeCarga = false;
+        _entrar(St567Screen.cargaManual);
+      case St567Screen.mezclando
+          when _corrida?.trabajo != null && !_mezclaIntermedia:
         // En un trabajo, cortar la mezcla pasa directo a descargar.
         _parcial = 0;
         _entrar(St567Screen.descargaGuia);
@@ -523,6 +571,7 @@ class St567Protocol implements SimulatorProtocol {
         _ingrediente = ingrediente;
         _kgACargar = kg;
         _parcial = 0;
+        _ingredienteDesdeCarga = false;
         _entrar(St567Screen.cargaManual);
         return 'Comando aplicado: carga manual de ${ingrediente.nombre}, $kg kg';
       case St567Screen.trabajos:
@@ -562,8 +611,13 @@ class St567Protocol implements SimulatorProtocol {
     if (_screen != St567Screen.cargaManual) {
       return null;
     }
-    // Lo pesado del ingrediente anterior no se acumula: se cambió sin ACUM.
-    _parcial = 0;
+    if (_options.sinListaIngredientes) {
+      return 'CTR,selectIngrediente: el indicador no tiene lista de '
+          'ingredientes, se ignora';
+    }
+    // Lo pesado sin ACUM no se acumula: si elige otro ingrediente el select
+    // arranca de cero; si vuelve con ESC, sigue donde estaba.
+    _ingredienteDesdeCarga = true;
     _entrar(St567Screen.elegirIngrediente);
     return 'Comando aplicado -> ${St567Screen.elegirIngrediente.label}';
   }
@@ -577,22 +631,37 @@ class St567Protocol implements SimulatorProtocol {
         _operario = operario;
         final int cargado = _parcial;
         _totalCargado += cargado;
+        _cargadoManual += cargado;
         _parcial = 0;
-        _entrar(St567Screen.elegirIngrediente);
-        return 'Comando aplicado: ACUM $cargado kg de '
+        final String log = 'Comando aplicado: ACUM $cargado kg de '
             '${_ingrediente?.nombre ?? '-'} ($quien)';
+        if (_options.sinListaIngredientes) {
+          _entrar(St567Screen.principal);
+          return '$log -> sin lista de ingredientes, vuelve a la principal';
+        }
+        _entrar(St567Screen.elegirIngrediente);
+        return log;
       case St567Screen.cargaReceta:
         _operario = operario;
         final _Corrida corrida = _corrida!;
         final _ItemCarga item = corrida.item;
         item.cargado = true;
         _totalCargado += _parcial;
+        corrida.cargado += _parcial;
         final String log =
             'Comando aplicado: ACUM $_parcial kg de ${item.ingrediente.nombre} '
             '($quien)';
         _parcial = 0;
         if (corrida.itemActual + 1 < corrida.items.length) {
           corrida.itemActual += 1;
+          final int mezcla = item.ingrediente.mezclaSeg;
+          if (_options.mezclaPorIngrediente && mezcla > 0) {
+            _segundosMezcla = mezcla;
+            _mezclaIntermedia = true;
+            _entrar(St567Screen.mezclando);
+            return '$log -> mezclando $mezcla s antes de '
+                '${corrida.item.ingrediente.nombre}';
+          }
         } else {
           _segundosMezcla = corrida.receta.mezclaSeg;
           _entrar(St567Screen.mezclando);
@@ -617,15 +686,27 @@ class St567Protocol implements SimulatorProtocol {
           return '$log -> ${trabajo.nombre} terminado';
         }
         corrida.loteActual += 1;
-        if (_totalCargado <= 0) {
+        // Avisa una vez por carga cuando lo que queda no alcanza para el
+        // resto de la guía, y otra vez si el mixer se vació (después de un
+        // CONTINUAR).
+        final int falta = corrida.faltaDescargar;
+        if (_totalCargado < falta &&
+            (!corrida.avisoMasCarga || _totalCargado <= 0)) {
+          corrida.avisoMasCarga = true;
           _entrar(St567Screen.masCarga);
-          return '$log -> el mixer quedó vacío, hay que preparar más carga';
+          return '$log -> quedan $_totalCargado kg en el mixer y faltan '
+              '$falta: hay que preparar más carga';
         }
         return log;
       case St567Screen.descargaManual:
         final int descargado = _parcial;
         _totalCargado = math.max(0, _totalCargado - descargado);
         _parcial = 0;
+        if (_totalCargado <= 0) {
+          _entrar(St567Screen.principal);
+          return 'Comando aplicado: ACUM $descargado kg en el lote $_lote -> '
+              'el mixer quedó vacío, vuelve a la principal';
+        }
         _entrar(St567Screen.loteYCantidad);
         return 'Comando aplicado: ACUM $descargado kg en el lote $_lote -> '
             'pedir lote y cantidad';
@@ -684,7 +765,7 @@ class St567Protocol implements SimulatorProtocol {
         // NUEVA: una carga nueva de la misma receta, por lo que falta
         // descargar; después de mezclar vuelve a los lotes pendientes.
         final _Corrida anterior = _corrida!;
-        _iniciarCarga(anterior.recarga());
+        _iniciarCarga(anterior.recarga(enMixer: _totalCargado));
         return 'Comando aplicado: NUEVA -> carga de '
             '${_corrida!.totalReceta} kg para los lotes pendientes';
       case St567Screen.reanudarTrabajo:
@@ -723,6 +804,7 @@ class St567Protocol implements SimulatorProtocol {
   void _iniciarCarga(_Corrida corrida) {
     _corrida = corrida;
     _parcial = 0;
+    _mezclaIntermedia = false;
     _entrar(St567Screen.cargaReceta);
   }
 
@@ -730,6 +812,13 @@ class St567Protocol implements SimulatorProtocol {
   /// suelta termina ahí.
   String _terminarMezcla() {
     final _Corrida? corrida = _corrida;
+    if (_mezclaIntermedia) {
+      _mezclaIntermedia = false;
+      _parcial = 0;
+      _entrar(St567Screen.cargaReceta);
+      return 'ST567: mezcla terminada -> carga de '
+          '${corrida!.item.ingrediente.nombre}';
+    }
     if (corrida != null && corrida.trabajo != null) {
       _parcial = 0;
       _entrar(St567Screen.descargaGuia);
@@ -749,14 +838,20 @@ class St567Protocol implements SimulatorProtocol {
     final St567Trabajo? trabajo = corrida?.trabajo;
     if (corrida != null && trabajo != null) {
       corrida
-        ..pantallaGuardada =
-            _screen == St567Screen.masCarga ? St567Screen.descargaGuia : _screen
+        ..pantallaGuardada = switch (_screen) {
+          St567Screen.masCarga => St567Screen.descargaGuia,
+          // Sólo la mezcla de un ingrediente llega acá: la del final de un
+          // trabajo pasa a la descarga con ESC.
+          St567Screen.mezclando => St567Screen.cargaReceta,
+          _ => _screen,
+        }
         ..parcialGuardado = _parcial
         ..segundosMezclaGuardados = _segundosMezcla;
       _pausadas[trabajo.indice] = corrida;
     }
     _corrida = null;
     _parcial = 0;
+    _mezclaIntermedia = false;
     _lock = false;
     _level = false;
     _volverDeOperario = St567Screen.principal;
@@ -862,27 +957,27 @@ class St567Protocol implements SimulatorProtocol {
     switch (_screen) {
       case St567Screen.cargaManual:
         return _armarPesaje(
-          total: _totalCargado + _parcial,
+          total: _cargadoManual + _parcial,
           objetivo: _kgACargar,
           avisoKg: _kgACargar * avisoPorcentaje ~/ 100,
         );
       case St567Screen.cargaReceta:
         final _ItemCarga item = _corrida!.item;
         return _armarPesaje(
-          total: _totalCargado + _parcial,
+          total: _corrida!.cargado + _parcial,
           objetivo: item.cantidad,
           avisoKg: item.avisoKg,
         );
       case St567Screen.descargaManual:
         return _armarPesaje(
-          total: _totalCargado - _parcial,
+          total: _mixerAlDescargar,
           objetivo: _kgADescargar,
           avisoKg: _kgADescargar * avisoPorcentaje ~/ 100,
         );
       case St567Screen.descargaGuia:
         final _LoteDescarga lote = _corrida!.lote;
         return _armarPesaje(
-          total: _totalCargado - _parcial,
+          total: _corrida!.descargadoGuia + _parcial,
           objetivo: lote.total,
           avisoKg: lote.total * avisoPorcentaje ~/ 100,
         );
@@ -1077,6 +1172,12 @@ class _Corrida {
   int itemActual = 0;
   int loteActual = 0;
 
+  /// Lo acumulado con ACUM en esta carga: el `total` de la `38`.
+  int cargado = 0;
+
+  /// Ya se mostró el `40` en esta carga.
+  bool avisoMasCarga = false;
+
   // Dónde estaba al pausarse con ESC, para CONTINUAR desde el diálogo 41.
   St567Screen pantallaGuardada = St567Screen.cargaReceta;
   int parcialGuardado = 0;
@@ -1088,17 +1189,33 @@ class _Corrida {
   int get totalReceta =>
       items.fold<int>(0, (int suma, _ItemCarga i) => suma + i.cantidad);
 
-  /// Carga nueva de la misma receta por lo que falta descargar, conservando
-  /// los lotes y el lote en curso.
-  _Corrida recarga() {
+  /// Lo descargado en los lotes ya pasados: con el parcial del lote en curso
+  /// es el `total` de la `39`.
+  int get descargadoGuia {
+    int suma = 0;
+    for (int i = 0; i < loteActual && i < lotes.length; i++) {
+      suma += lotes[i].descargado;
+    }
+    return suma;
+  }
+
+  /// Lo que falta descargar del lote en curso y los que siguen.
+  int get faltaDescargar {
     int falta = 0;
     for (int i = loteActual; i < lotes.length; i++) {
       falta += lotes[i].total - lotes[i].descargado;
     }
+    return falta;
+  }
+
+  /// Carga nueva de la misma receta por lo que falta descargar menos lo que
+  /// sigue en el mixer, conservando los lotes y el lote en curso.
+  _Corrida recarga({required int enMixer}) {
+    final int kg = math.max(0, faltaDescargar - enMixer);
     return _Corrida._(
       receta: receta,
       items: <_ItemCarga>[
-        for (final St567IngredienteReceta i in _escalar(receta, falta))
+        for (final St567IngredienteReceta i in _escalar(receta, kg))
           _ItemCarga(i),
       ],
       trabajo: trabajo,
