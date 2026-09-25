@@ -1,14 +1,14 @@
 # Protocolo Remoto BLE – Indicador **ST456web** (guía para el simulador)
 
-**Origen de la información:** análisis del código de la app `remoto_567_flutter` versión **5.0.0-beta+44**, rama `RemotoBLE`
+**Origen de la información:** análisis del código de la app `remoto_567_flutter` versión **5.0.5-beta+49**, rama `RemotoBLE`
 (`lib/provider/conexion/remoto_common_ble.dart`, `lib/provider/protocolos/st456_coma_parser.dart`,
 `lib/provider/stream_provider_remoto.dart`, `lib/models/**`, `lib/pages/**`, `lib/pages/remoto.dart`) y del historial
 git del proyecto (el proyecto nació como `remoto_st456` con las pantallas `0`–`12`; las de la serie `30`–`60` se agregaron después para el ST567).
-**Fecha:** 14/09/2026.
+**Fecha:** 14/09/2026 · **Actualizado:** 24/09/2026 (pantallas `35`/`36`, diálogos locales, flujo de detalles, máquina de estados y numeración ST407).
 
 > Todo lo que dice este documento sobre **formato de tramas, campos y comandos** sale directamente del código de la app y es exacto.
 > La **secuencia entre pantallas** (qué pantalla responde el indicador a cada comando) la decide el firmware del ST456web, que no está en
-> este repositorio. Los flujos de la sección 8 son los que la app asume por el diseño de sus botones y por el historial del proyecto; el
+> este repositorio. Los flujos de las secciones 8 y 9 son los que la app asume por el diseño de sus botones y por el historial del proyecto; el
 > simulador puede respetarlos o ajustarlos al comportamiento real del indicador.
 
 ---
@@ -23,8 +23,9 @@ git del proyecto (el proyecto nació como `remoto_st456` con las pantallas `0`�
 6. [Tabla resumen de pantallas](#6-tabla-resumen-de-pantallas)
 7. [Detalle de cada pantalla](#7-detalle-de-cada-pantalla)
 8. [Flujos completos sugeridos](#8-flujos-completos-sugeridos)
-9. [Checklist y errores comunes](#9-checklist-y-errores-comunes)
-10. [Apéndice](#10-apéndice)
+9. [Máquina de estados del simulador](#9-máquina-de-estados-del-simulador)
+10. [Checklist y errores comunes](#10-checklist-y-errores-comunes)
+11. [Apéndice](#11-apéndice)
 
 ---
 
@@ -41,12 +42,13 @@ Pantallas que la app usa con el **ST456web**:
 | Detalles | `18` |
 | Diálogos con botones | `14`, `15`, `19`, `35`, `36` |
 | Popups sin botones | `16`, `17`, `20`, `43`, `44`, `45` |
+| Diálogos locales de la tablet (no son pantallas) | menú, descarga manual, SALIR, ACUMULAR, cambiar operario, PIN: ver 7.18 |
 
 Notas de alcance:
 
 * Según el manual de usuario, **Carga Manual**, **Descarga Manual** y **LevelLock** son funciones del ST567. La app igual envía esos comandos (`CTR,cargaManual`, `CTR,descargaManual,…`, `CTR,levelLock`) porque el menú es el mismo; el simulador ST456web puede ignorarlos o responder. Las pantallas `2` y `4` existen desde la versión original ST456 y la app las muestra si llegan.
 * Pantallas que **no** son del ST456web pero la app también procesa (pertenecen al ST567, ver `protocolo-simulador-st567.md`): `30`, `31`, `32`, `33`, `34`, `37`, `38`, `39`, `40`, `41`, `60`.
-* Pantallas reservadas que el simulador **no debe usar**: `13` (ignorada) y `100`–`110` (indicador ST407).
+* Pantallas reservadas que el simulador **no debe usar**: `13` (ignorada) y `100`–`110` (indicador ST407, ver 11.3).
 
 ---
 
@@ -361,6 +363,8 @@ Modelo: `PantallaElegirRecetaModel.fromParceo` · Vista: `elegir_receta_page.dar
 
 Botones → comandos: ESC → `CTR,esc`; prev → `CTR,prev`; next → `CTR,next`; START → `CTR,start,<cantidad editada>` (esperar `1`). El peso no se muestra en esta pantalla (recuadro con rayas).
 
+> La validación del START en la app es `isNotEmpty || != '0'`, que siempre da verdadero: el simulador puede recibir `CTR,start,\r\n` (cantidad vacía) o `CTR,start,0\r\n`. Sugerido: en ese caso usar la cantidad que había enviado en `8`, o quedarse en `8`.
+
 ### 7.8 Pantalla `9` – Elegir autónomo
 
 Modelo: campos en `PantallaElegirAutonomoModel` · Vista: `elegir_autonomo_page.dart`.
@@ -435,7 +439,7 @@ Obligatorio: 2 campos (si falta `[1]` la trama falla).
 12,1500\r\n
 ```
 
-Botones → comandos: ESC → `CTR,esc`; START → `CTR,start,<valor del campo>` (esperar `1`).
+Botones → comandos: ESC → `CTR,esc`; START → `CTR,start,<valor del campo>` (esperar `1`). El campo usa teclado numérico pero **no tiene filtro**: puede llegar vacío o con `.`/`-`; el simulador debe tolerarlo.
 
 ### 7.12 Pantallas `14` y `15` – Diálogos de dos botones
 
@@ -485,7 +489,7 @@ Botón: ESC → `CTR,esc` (volver a `11`).
 19,100\r\n
 ```
 
-Botón: ESC → `CTR,esc`. Al terminar, enviar `0` (o `36`/`35`, que la app también muestra: diálogo "La sincronización ha sido exitosa / ha fallado" con OK → `CTR,esc`).
+Botón: ESC → `CTR,esc`. Al terminar, enviar `0` (o `36`/`35`, ver 7.17).
 
 ### 7.15 Pantalla `42` – Cambio de operario (login)
 
@@ -519,6 +523,27 @@ Sin campos (`<id>\r\n`). Vista: `popups.dart`. Título fijo "INFO" y texto:
 | `45` | Indicador ocupado, salga de la pantalla actual del indicador (con botón *Desconectar*) | ST456web ≥ v1.38.5, mientras el operador está en un menú local. |
 
 No tienen ESC: el simulador debe enviar otra pantalla (p. ej. `0` o `11`) para salir.
+
+### 7.17 Pantallas `35` y `36` – Resultado de sincronización
+
+Sin campos: `35\r\n` (falló) / `36\r\n` (exitosa). Vista: `dialogo_sincronizacion.dart`. Textos fijos: "La sincronización ha fallado" / "La sincronización ha sido exitosa".
+
+Botones: OK → `CTR,esc`; ESC → `CTR,esc`. Después del `esc` el indicador debe enviar `0`. Son opcionales en el ST456web: si el firmware no las envía, después de `19,100` se puede mandar `0` directamente.
+
+### 7.18 Diálogos locales de la app (no son pantallas)
+
+La tablet los abre **sin** que el indicador envíe nada; el simulador sólo ve el comando que sale al confirmar. Mientras están abiertos la app sigue procesando tramas.
+
+| Diálogo | Dónde se abre | Campos / validación | Comando al confirmar |
+|---|---|---|---|
+| **Menú principal** ("Selección") | `0`, botón *menú* | Carga Manual, Carga Por Receta, Descarga Manual, Iniciar Trabajo, Seleccionar Operario, Buscar actualización | `CTR,cargaManual` · `CTR,elegirReceta` · (abre diálogo de descarga manual) · `CTR,elegirTrabajo` · `CTR,cambiarOperario` · (local) |
+| **Descarga Manual** (desde el menú) | Menú → *Descarga Manual* | *Lote* máx. 3 caracteres sin filtro; *Cantidad* sólo dígitos, acepta `0`. Si alguno está vacío cierra sin enviar | `CTR,descargaManual,<lote>,<kg>` |
+| **SALIR** – "¿Está seguro que desea salir?" | ESC en `1`, `2`, `3`, `4` | – | `CTR,esc` |
+| **ACUMULAR** – "¿Está seguro que desea pasar el ingrediente?" | ACUM en `1`, `2`, `3`, `4` (en `3` el texto también dice "ingrediente") | – | `CTR,acum,<operario>` (`1`, `2`, `3`) · `CTR,acum` (`4`) |
+| **Cambiar operario** – "¿Desea cambiar el operario de la tablet?" | Botón *Operario* de la barra en `1`, `2` | – | `CTR,cambiarOperario` |
+| **PIN del operario** | `42`, botón START | 4 dígitos, comparados con el `password` recibido | `CTR,esc` si coincide |
+
+Las pantallas `8`, `9`, `10`, `11`, `12` **no** tienen diálogo de confirmación: los botones envían el comando directamente.
 
 ---
 
@@ -561,6 +586,24 @@ app → CTR,select,2                    (fila 2 de la página actual)
       sin operario en el indicador →  sim → 16 → (luego) sim → 11
       carga ya hecha →                sim → 17 → (luego) sim → 11 o 3
 ```
+
+### 8.3.1 Detalles de receta / guía (pantalla `18`)
+
+El detalle sólo se pide desde `11` con el botón *Detalles* de una fila (`CTR,detail,<indice>`). El `tipo` de `18` depende del trabajo:
+
+```
+trabajo RECE (sólo receta)
+app → CTR,detail,1      sim → 18,1,Vacas Lecheras,,5,3,0,Maiz,600,Soja,300,Heno,900
+trabajo GUIA (sólo guía)
+app → CTR,detail,2      sim → 18,2,Corrales A,Corrales A,0,0,2,Corral 1,1000,Corral 2,800
+trabajo AUTO (receta + guía)
+app → CTR,detail,3      sim → 18,3,Vacas Lecheras,Corrales A,5,3,2,Maiz,600,Soja,300,Heno,900,Corral 1,1000,Corral 2,800
+app → CTR,esc           sim → 11 (la misma página)
+```
+
+* Los kg son los del trabajo (receta ya multiplicada por la cantidad del trabajo).
+* `18` tipo `1` rotula el nombre como `Nombre Autónomo :` (peculiaridad de la vista).
+* No hay detalle desde `8`, `9` ni `10`.
 
 ### 8.4 Descarga por guía
 
@@ -606,7 +649,57 @@ app → CTR,esc                         sim → 0
 
 ---
 
-## 9. Checklist y errores comunes
+## 9. Máquina de estados del simulador
+
+Qué responder a cada comando según la pantalla actual. Un comando que no aparece para una pantalla se puede ignorar (reenviar la pantalla actual).
+
+| Pantalla actual | Comando | Respuesta sugerida |
+|---|---|---|
+| `0` | `sync` | `19…` → `0` (o `36`/`35`) |
+| `0` | `cero` | `0` con peso 0 |
+| `0` | `levelLock` | ignorar (función ST567) o `0` |
+| `0` | `elegirReceta` | `8` |
+| `0` | `elegirTrabajo` | `11` (o `20` → `0`) |
+| `0` | `cargaManual` / `descargaManual,<lote>,<kg>` | ignorar, o `2` / `4` |
+| `0` | `cambiarOperario` | `42` |
+| `8` | `next` / `prev` | `8` con otra receta |
+| `8` | `start,<kg>` | `1` (o `16` sin operario) |
+| `8` | `esc` | `0` |
+| `9` | `next` | `9` con otro autónomo |
+| `9` | `start` | `1` (carga del autónomo; al terminar `6` → `3`) |
+| `9` | `esc` | `0` o `11` |
+| `10` | `next` | `10` con otra guía |
+| `10` | `start` | `3` |
+| `10` | `esc` | `0` o `11` |
+| `11` | `nextPage` / `prevPage` | `11` con otra página |
+| `11` | `detail,<indice>` | `18` |
+| `11` | `select,<posicion>` | `15` / `14` / `9` / `10` / `12` / `16` / `17` según el trabajo |
+| `11` | `esc` | `0` |
+| `18` | `esc` | `11` |
+| `15` | `boton1` / `boton2` / `esc` | `12` o `1` (carga) / `10` o `3` (descarga) / `11` |
+| `14` | `boton1` / `boton2` / `esc` | `3` (continuar la descarga pendiente) / `12` o `1` (nueva carga) / `11` |
+| `12` | `start,<kg>` | `1` |
+| `12` | `esc` | `11` o `0` |
+| `1` | `acum,<op>` | `1` siguiente ingrediente · último → `6` → `0` (o `3`) |
+| `1` | `lock` / `level` | `1` con el flag alternado |
+| `1` | `rotate` | nada |
+| `1` | `cambiarOperario` | `42` → (esc) → `1` |
+| `1` | `esc` | `0` |
+| `3` | `acum,<op>` | `3` siguiente lote · último → `0` |
+| `3` | `lock` / `level` / `rotate` | igual que `1` |
+| `3` | `esc` | `0` |
+| `2` | `acum,<op>` · `lock` · `level` · `cambiarOperario` · `esc` | `2` o `0` · flag · flag · `42` · `0` |
+| `2` | `selectIngrediente` | ignorar (función ST567) |
+| `4` | `acum` · `lock` · `level` · `esc` | `4` o `0` · flag · flag · `0` |
+| `6` | `esc` | `0` |
+| `19` | `esc` | `0` (o `35`) |
+| `35` / `36` | `esc` | `0` |
+| `42` | `esc` | pantalla anterior (`0`, `1` o `2`) |
+| `16`, `17`, `20`, `43`, `44`, `45` | (no hay comandos) | el simulador sale solo enviando otra pantalla |
+
+---
+
+## 10. Checklist y errores comunes
 
 * [ ] Cabecera de 5 bytes en **cada** notificación; en una sola parte, `longitud` = bytes del payload incluidos `\r\n` (si no coincide, la trama se descarta en silencio).
 * [ ] `numParte` empieza en **1**; `idPaquete` distinto para cada trama lógica.
@@ -618,25 +711,26 @@ app → CTR,esc                         sim → 0
 * [ ] `18`: los contadores `[5]` y `[6]` deben coincidir con los pares enviados; en tipo `2` poner el nombre de la guía también en `[2]`.
 * [ ] Refrescar la pantalla de peso periódicamente; no hay polling desde la app.
 * [ ] Después de un popup sin botones (`16`, `17`, `20`, `43`, `44`, `45`) enviar otra pantalla para salir.
+* [ ] Tolerar `CTR,start,` con cantidad vacía (desde `8` y `12`), `CTR,acum,` con operario vacío y `<lote>` con caracteres raros desde el menú.
 * [ ] Codificación Latin-1/ASCII, no UTF-8 multibyte.
 
 ---
 
-## 10. Apéndice
+## 11. Apéndice
 
-### 10.1 Etiquetas que muestra la app (idioma español)
+### 11.1 Etiquetas que muestra la app (idioma español)
 
 `Total : `, `Parcial : `, `Kg a Cargar: `, `Kg a Descargar:  `, `Nº Ingrediente: `, `Nombre:`, `Cargando : `, `Descargando Lote: `, `Progreso de Carga`, `Progreso de Descarga`, `Fecha`, `OPERARIO`, `Receta`, `Cantidad`, `Nº de Autonomo : `, `Nombre Autónomo`, `Fecha inicio : `, `Fecha final : `, `Guía`, `Nº de Guía : `, `ID: `, `ORDEN: `, `TIPO: `, `PARCIAL : `, `Mezclando`, `Sincronizando Indicador`, `Seleccionar Trabajo`, `Elegir Receta`, `Elegir Autónomo`, `Elegir Guía`, `Detalles Recetas - Guías`, `CAMBIO DE OPERARIO`.
 
-### 10.2 Pantallas del ST567 (no usar con ST456web)
+### 11.2 Pantallas del ST567 (no usar con ST456web)
 
-`30`/`60` elegir receta (lista), `31` detalle de trabajo, `32` elegir ingrediente, `33` diálogo lote+cantidad, `34` trabajos (3 campos por trabajo, hasta 15), `37` detalle de receta, `38` carga por receta con lista, `39` descarga por guía con lotes, `40`/`41` diálogos. Están documentadas en `protocolo-simulador-st567.md`.
+`30`/`60` elegir receta (lista), `31` detalle de trabajo (receta + lotes), `32` elegir ingrediente, `33` diálogo lote+cantidad, `34` trabajos (3 campos por trabajo, hasta 15), `37` detalle de receta, `38` carga por receta con lista, `39` descarga por guía con lotes, `40`/`41` diálogos. Están documentadas en `protocolo-simulador-st567.md`.
 
-### 10.3 Pantallas del ST407 (no usar)
+### 11.3 Pantallas del ST407 (no usar)
 
-`100`–`110`. Tienen otros modelos de datos.
+Numeración vigente desde la versión 5.0.4 de la app: `100` principal, `101` carga por receta, `102` carga manual, `103` descarga por guía, `104` descarga manual, `106` mezclando, `108` elegir receta, `109` elegir autónomo, `110` elegir guía (`105` no existe; `107` "más mezcla" es un popup que la app no procesa). Tienen otros modelos de datos y usan comandos `FCN,…`.
 
-### 10.4 Versiones de firmware mencionadas en el repositorio
+### 11.4 Versiones de firmware mencionadas en el repositorio
 
 | Función | ST456web |
 |---|---|
