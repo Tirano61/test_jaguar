@@ -122,6 +122,18 @@ class St567View extends StatelessWidget {
                   options.copyWith(sinTrabajos: v),
                 ),
               ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('Indicador sin operario'),
+                subtitle: const Text(
+                  'elegir una receta o un trabajo responde el popup 16',
+                ),
+                value: options.sinOperario,
+                onChanged: (bool v) => controller.setSt567Options(
+                  options.copyWith(sinOperario: v),
+                ),
+              ),
             ],
           ),
         ),

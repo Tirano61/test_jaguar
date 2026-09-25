@@ -7,6 +7,7 @@ class St567Options {
     this.recetasConPreset = true,
     this.sincronizacionFalla = false,
     this.sinTrabajos = false,
+    this.sinOperario = false,
   });
 
   /// Firmware ≥ 1.36.3: `CTR,elegirReceta` responde `60` (con preset) en vez
@@ -19,15 +20,22 @@ class St567Options {
   /// `CTR,elegirTrabajo` responde el popup `20` en vez de la lista.
   final bool sinTrabajos;
 
+  /// El indicador no tiene operario elegido: elegir una receta o un trabajo
+  /// responde el popup `16`. El ST567 exige operario para cargar, y el que se
+  /// elige en la tablet (`42`) no le llega: la app lo valida localmente.
+  final bool sinOperario;
+
   St567Options copyWith({
     bool? recetasConPreset,
     bool? sincronizacionFalla,
     bool? sinTrabajos,
+    bool? sinOperario,
   }) {
     return St567Options(
       recetasConPreset: recetasConPreset ?? this.recetasConPreset,
       sincronizacionFalla: sincronizacionFalla ?? this.sincronizacionFalla,
       sinTrabajos: sinTrabajos ?? this.sinTrabajos,
+      sinOperario: sinOperario ?? this.sinOperario,
     );
   }
 }

@@ -144,6 +144,18 @@ void main() {
       expect(ind.trama, startsWith('0,1250,1,kg,Dario,'));
     });
 
+    test('sin operario, elegir una receta muestra el 16 y vuelve a la '
+        'principal', () {
+      final _Indicador ind = _Indicador();
+      ind.protocolo.setOptions(const St567Options(sinOperario: true));
+      ind.app('CTR,elegirReceta');
+      ind.app('CTR,select,1,1500');
+      expect(ind.trama, '16\r\n');
+
+      ind.ticks(St567Protocol.ticksPopup);
+      expect(ind.pantalla, St567Screen.principal);
+    });
+
     test('la cantidad pedida escala la receta', () {
       final _Indicador ind = _Indicador();
       ind.app('CTR,elegirReceta');
@@ -363,6 +375,61 @@ void main() {
 
       ind.app('CTR,boton1');
       expect(ind.trama, startsWith('38,120,120,1200,Maiz,'));
+    });
+
+    test('ESC en la mezcla de un trabajo pasa directo a descargar', () {
+      final _Indicador ind = _Indicador();
+      ind.app('CTR,elegirTrabajo');
+      ind.app('CTR,select,3');
+      for (int i = 0; i < 3; i++) {
+        ind.ticks(20);
+        ind.app('CTR,acum,Dario');
+      }
+      ind.ticks(5);
+      expect(ind.pantalla, St567Screen.mezclando);
+
+      ind.app('CTR,esc');
+      expect(ind.trama, startsWith('39,2000,0,1200,Corral 6,'));
+    });
+
+    test('un trabajo abandonado en la descarga avisa con el 17 y sigue '
+        'descargando', () {
+      final _Indicador ind = _Indicador();
+      ind.app('CTR,elegirTrabajo');
+      ind.app('CTR,select,3');
+      for (int i = 0; i < 3; i++) {
+        ind.ticks(20);
+        ind.app('CTR,acum,Dario');
+      }
+      ind.ticks(46 + 20);
+      ind.app('CTR,acum,Dario');
+      ind.ticks(4);
+      expect(ind.trama, startsWith('39,640,160,800,Corral 7,'));
+      ind.app('CTR,esc');
+      expect(ind.pantalla, St567Screen.principal);
+
+      ind.app('CTR,elegirTrabajo');
+      ind.app('CTR,select,3');
+      expect(ind.trama, '17\r\n');
+
+      // El popup no tiene ESC: si llega igual no corta la reanudación.
+      expect(ind.app('CTR,esc'), contains('se ignora'));
+      ind.ticks(St567Protocol.ticksPopup);
+      expect(ind.logs.last, contains('popup 17 -> 39'));
+      expect(ind.trama, startsWith('39,640,160,800,Corral 7,'));
+    });
+
+    test('sin operario, elegir un trabajo muestra el 16 y vuelve a la lista',
+        () {
+      final _Indicador ind = _Indicador();
+      ind.protocolo.setOptions(const St567Options(sinOperario: true));
+      ind.app('CTR,elegirTrabajo');
+      ind.app('CTR,nextPage');
+      ind.app('CTR,select,6');
+      expect(ind.trama, '16\r\n');
+
+      ind.ticks(St567Protocol.ticksPopup);
+      expect(ind.trama, startsWith('34,1,6,Recria Oeste,'));
     });
 
     test('REINICIAR arranca el trabajo de cero', () {
