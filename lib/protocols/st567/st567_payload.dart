@@ -139,6 +139,23 @@ class St567Payload {
     ]);
   }
 
+  /// Pantalla `18` con `tipo` 2 (sólo guía): `tipo,nombreReceta,nombreGuia,
+  /// minutosMezcla,nIng,nLotes,(lote,kg)*nLotes`.
+  ///
+  /// Es la pantalla de detalle del ST456web. En tipo 2 la app muestra el campo
+  /// de la receta en el panel de la guía, así que el nombre va en los dos.
+  static String detalleGuia(String guia, List<St567Lote> lotes) {
+    return frame(St567Screen.detalleGuia, <Object>[
+      2,
+      guia,
+      guia,
+      0,
+      0,
+      lotes.length,
+      for (final St567Lote l in lotes) ...<Object>[l.nombre, l.kg],
+    ]);
+  }
+
   /// Pantalla `37`: `nombre,mezclaSeg,tipo,n,(nombre,cantidad,tipoAviso,aviso,
   /// mezclaSeg)*n`. Cada ingrediente lleva los cinco campos siempre: uno
   /// truncado rompe el parseo en la app.

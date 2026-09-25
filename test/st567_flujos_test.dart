@@ -430,6 +430,50 @@ void main() {
       }
     });
 
+    test('la 18 muestra sólo la guía del primer trabajo y vuelve a la '
+        'principal', () {
+      final _Indicador ind = _Indicador();
+      expect(ind.protocolo.goTo(St567Screen.detalleGuia),
+          contains('"Corrales Este" (Trabajo Manana)'));
+      expect(ind.trama,
+          '18,2,Corrales Este,Corrales Este,0,0,2,Corral 1,800,Corral 2,700\r\n');
+      ind.app('CTR,esc');
+      expect(ind.pantalla, St567Screen.principal);
+    });
+
+    test('la 18 desde un detalle muestra esa guía y vuelve al detalle', () {
+      final _Indicador ind = _Indicador();
+      ind.app('CTR,elegirTrabajo');
+      ind.app('CTR,nextPage');
+      ind.app('CTR,detail,6');
+      ind.protocolo.goTo(St567Screen.detalleGuia);
+      expect(ind.trama,
+          '18,2,Lotes Recria,Lotes Recria,0,0,2,Lote O1,450,Lote O2,450\r\n');
+
+      ind.app('CTR,esc');
+      expect(ind.pantalla, St567Screen.detalleTrabajo);
+      ind.app('CTR,esc');
+      expect(ind.trama, startsWith('34,1,6,Recria Oeste,0'));
+    });
+
+    test('la 18 en medio de una descarga muestra la guía del trabajo en curso',
+        () {
+      final _Indicador ind = _Indicador();
+      ind.app('CTR,elegirTrabajo');
+      ind.app('CTR,select,3');
+      for (int i = 0; i < 3; i++) {
+        ind.ticks(20);
+        ind.app('CTR,acum,Dario');
+      }
+      ind.ticks(46);
+      expect(ind.pantalla, St567Screen.descargaGuia);
+
+      ind.protocolo.goTo(St567Screen.detalleGuia);
+      expect(ind.trama, startsWith('18,2,Corrales Sur,Corrales Sur,0,0,2,'));
+      ind.app('CTR,esc');
+      expect(ind.trama, startsWith('39,'));
+    });
+
     test('la 42 forzada vuelve a la principal aunque antes se haya entrado '
         'desde una carga', () {
       final _Indicador ind = _Indicador();

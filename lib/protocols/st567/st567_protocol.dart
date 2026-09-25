@@ -134,6 +134,10 @@ class St567Protocol implements SimulatorProtocol {
   St567Trabajo? _trabajoDetalle;
   St567Screen _volverDeOperario = St567Screen.principal;
 
+  /// El trabajo cuya guía muestra la `18` y a dónde vuelve su ESC.
+  St567Trabajo? _trabajoGuia;
+  St567Screen _volverDeGuia = St567Screen.principal;
+
   St567Screen get screen => _screen;
 
   St567State get state => St567State(
@@ -156,8 +160,36 @@ class St567Protocol implements SimulatorProtocol {
     // Forzada desde la UI, la 42 no viene de ninguna carga: el ESC vuelve a la
     // principal.
     _volverDeOperario = St567Screen.principal;
+    if (screen == St567Screen.detalleGuia) {
+      return _verGuia();
+    }
     _entrar(screen);
     return 'Pantalla ST567 seleccionada: ${screen.label}';
+  }
+
+  /// La `18` no la pide ningún comando del ST567: la fuerza el tester para ver
+  /// una guía sola. Muestra la del trabajo en curso, o la del último detalle
+  /// que se abrió, o la del primero del catálogo.
+  String _verGuia() {
+    final St567Trabajo? trabajo = _corrida?.trabajo ??
+        _trabajoDetalle ??
+        (catalog.trabajos.isEmpty ? null : catalog.trabajos.first);
+    if (trabajo == null) {
+      return 'ST567: no hay trabajos, no hay guía para mostrar';
+    }
+    _trabajoGuia = trabajo;
+    // Desde la lista, el detalle o la descarga, el ESC vuelve ahí; desde
+    // cualquier otra, a la principal.
+    _volverDeGuia = const <St567Screen>{
+      St567Screen.trabajos,
+      St567Screen.detalleTrabajo,
+      St567Screen.descargaGuia,
+    }.contains(_screen)
+        ? _screen
+        : St567Screen.principal;
+    _entrar(St567Screen.detalleGuia, mantenerPagina: true);
+    return 'Pantalla ST567 seleccionada: ${St567Screen.detalleGuia.label} '
+        '"${trabajo.guia}" (${trabajo.nombre})';
   }
 
   String setOptions(St567Options options) {
@@ -385,6 +417,8 @@ class St567Protocol implements SimulatorProtocol {
         _entrar(St567Screen.trabajos, mantenerPagina: true);
       case St567Screen.cambioOperario:
         _entrar(_volverDeOperario);
+      case St567Screen.detalleGuia:
+        _entrar(_volverDeGuia, mantenerPagina: true);
       case St567Screen.cargaManual:
       case St567Screen.descargaManual:
       case St567Screen.cargaReceta:
@@ -748,6 +782,9 @@ class St567Protocol implements SimulatorProtocol {
           receta: receta,
           ingredientes: _escalar(receta, trabajo.kg),
         );
+      case St567Screen.detalleGuia:
+        final St567Trabajo trabajo = _trabajoGuia!;
+        return St567Payload.detalleGuia(trabajo.guia, trabajo.lotes);
       case St567Screen.elegirReceta:
         return St567Payload.recetas(_paginaDe(catalog.recetas));
       case St567Screen.elegirRecetaPreset:

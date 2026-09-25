@@ -137,6 +137,7 @@ class St567Catalog {
       St567Trabajo(
         indice: '1',
         nombre: 'Trabajo Manana',
+        guia: 'Corrales Este',
         receta: '1',
         kg: 1500,
         bachada: '2',
@@ -148,6 +149,7 @@ class St567Catalog {
       St567Trabajo(
         indice: '2',
         nombre: 'Trabajo Tarde',
+        guia: 'Corrales Oeste',
         receta: '2',
         kg: 800,
         bachada: '1',
@@ -165,6 +167,7 @@ class St567Catalog {
       St567Trabajo(
         indice: '3',
         nombre: 'Trabajo Noche',
+        guia: 'Corrales Sur',
         receta: '3',
         kg: 2000,
         bachada: '1',
@@ -176,6 +179,7 @@ class St567Catalog {
       St567Trabajo(
         indice: '4',
         nombre: 'Vaquillonas Norte',
+        guia: 'Lote Norte',
         receta: '4',
         kg: 1000,
         bachada: '1',
@@ -187,6 +191,7 @@ class St567Catalog {
       St567Trabajo(
         indice: '5',
         nombre: 'Secas Sur',
+        guia: 'Lote Sur',
         receta: '5',
         kg: 600,
         bachada: '1',
@@ -198,6 +203,7 @@ class St567Catalog {
       St567Trabajo(
         indice: '6',
         nombre: 'Recria Oeste',
+        guia: 'Lotes Recria',
         receta: '7',
         kg: 900,
         bachada: '1',
@@ -275,6 +281,7 @@ class St567Trabajo {
     required this.porcentaje,
     required this.viajes,
     required this.completo,
+    required this.guia,
     required this.lotes,
   });
 
@@ -294,6 +301,10 @@ class St567Trabajo {
 
   /// Si ya figura como realizado al arrancar el simulador.
   final bool completo;
+
+  /// Nombre de la guía de descarga. Sólo lo muestra la pantalla `18`: la `31`
+  /// y la `39` listan los lotes sin nombrar la guía.
+  final String guia;
   final List<St567Lote> lotes;
 }
 
