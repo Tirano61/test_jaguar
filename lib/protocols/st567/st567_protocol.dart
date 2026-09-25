@@ -85,6 +85,9 @@ class St567Protocol implements SimulatorProtocol {
   int _pagina = 0;
   int _ticksEnPopup = 0;
 
+  /// A dónde pasa el popup vigente cuando se cierra solo.
+  St567Screen _trasPopup = St567Screen.principal;
+
   // --- Balanza ---
 
   /// Último peso del motor. `null` hasta el primer tick del modo.
@@ -197,7 +200,8 @@ class St567Protocol implements SimulatorProtocol {
     return 'Opciones ST567: '
         'recetas ${options.recetasConPreset ? 'con preset (60)' : 'sin preset (30)'}, '
         'sincronización ${options.sincronizacionFalla ? 'falla' : 'exitosa'}, '
-        '${options.sinTrabajos ? 'sin trabajos' : 'con trabajos'}';
+        '${options.sinTrabajos ? 'sin trabajos' : 'con trabajos'}, '
+        '${options.sinOperario ? 'sin operario' : 'con operario'}';
   }
 
   /// Descarta la sesión al salir del modo. Las opciones se conservan: son
@@ -217,6 +221,7 @@ class St567Protocol implements SimulatorProtocol {
     _pausadas.clear();
     _trabajoPorReanudar = null;
     _volverDeOperario = St567Screen.principal;
+    _trasPopup = St567Screen.principal;
     _completos
       ..clear()
       ..addAll(<String>{
@@ -276,9 +281,9 @@ class St567Protocol implements SimulatorProtocol {
         if (_screen.isPopup && _screen != St567Screen.indicadorOcupado) {
           _ticksEnPopup += 1;
           if (_ticksEnPopup >= ticksPopup) {
-            log('ST567: se cierra el popup ${_screen.code} y vuelve a la '
-                'principal');
-            _entrar(St567Screen.principal);
+            final St567Screen popup = _screen;
+            _entrar(_trasPopup, mantenerPagina: true);
+            log('ST567: se cierra el popup ${popup.code} -> ${_screen.label}');
           }
         }
     }
@@ -401,6 +406,12 @@ class St567Protocol implements SimulatorProtocol {
 
   String _esc() {
     final St567Screen desde = _screen;
+    if (desde.isPopup) {
+      // La app no tiene cómo mandarlo: los popups no tienen botones. Si llega
+      // igual, no se corta lo que el popup está por retomar (el 17 sigue en la
+      // descarga).
+      return 'CTR,esc en el popup ${desde.code}: no tiene ESC, se ignora';
+    }
     switch (desde) {
       case St567Screen.principal:
         return 'CTR,esc en la pantalla principal: no hay a dónde volver';
@@ -419,6 +430,12 @@ class St567Protocol implements SimulatorProtocol {
         _entrar(_volverDeOperario);
       case St567Screen.detalleGuia:
         _entrar(_volverDeGuia, mantenerPagina: true);
+      case St567Screen.mezclando when _corrida?.trabajo != null:
+        // En un trabajo, cortar la mezcla pasa directo a descargar.
+        _parcial = 0;
+        _entrar(St567Screen.descargaGuia);
+        return 'Comando aplicado: CTR,esc corta la mezcla -> '
+            '${St567Screen.descargaGuia.label}';
       case St567Screen.cargaManual:
       case St567Screen.descargaManual:
       case St567Screen.cargaReceta:
@@ -487,6 +504,11 @@ class St567Protocol implements SimulatorProtocol {
         if (receta == null) {
           return 'CTR,select: no existe la receta $indice';
         }
+        if (_options.sinOperario) {
+          _popup(St567Screen.sinOperario);
+          return 'CTR,select: el indicador no tiene operario -> '
+              '${St567Screen.sinOperario.label}';
+        }
         final int kg = _parseKg(command.arg(1)) ?? 0;
         _iniciarCarga(_Corrida.receta(receta, kg: kg > 0 ? kg : receta.preset));
         return 'Comando aplicado: carga de ${receta.nombre}, '
@@ -508,7 +530,22 @@ class St567Protocol implements SimulatorProtocol {
         if (trabajo == null) {
           return 'CTR,select: no existe el trabajo $indice';
         }
-        if (_pausadas.containsKey(trabajo.indice)) {
+        if (_options.sinOperario) {
+          _popup(St567Screen.sinOperario, despues: St567Screen.trabajos);
+          return 'CTR,select: el indicador no tiene operario -> '
+              '${St567Screen.sinOperario.label}';
+        }
+        final _Corrida? pausada = _pausadas[trabajo.indice];
+        if (pausada != null &&
+            pausada.pantallaGuardada == St567Screen.descargaGuia) {
+          // La carga ya se hizo: avisa y sigue descargando donde quedó.
+          _pausadas.remove(trabajo.indice);
+          _reanudar(pausada);
+          _popup(St567Screen.cargaRealizada, despues: St567Screen.descargaGuia);
+          return 'Comando aplicado: ${trabajo.nombre} ya tiene la carga hecha '
+              '-> ${St567Screen.cargaRealizada.label}';
+        }
+        if (pausada != null) {
           _trabajoPorReanudar = trabajo.indice;
           _entrar(St567Screen.reanudarTrabajo, mantenerPagina: true);
           return 'Comando aplicado: ${trabajo.nombre} quedó a medias -> '
@@ -655,9 +692,7 @@ class St567Protocol implements SimulatorProtocol {
         _trabajoPorReanudar = null;
         final _Corrida pausada = _pausadas.remove(indice)!;
         if (boton == 1) {
-          _corrida = pausada;
-          _parcial = pausada.parcialGuardado;
-          _segundosMezcla = pausada.segundosMezclaGuardados;
+          _reanudar(pausada);
           _entrar(pausada.pantallaGuardada);
           return 'Comando aplicado: CONTINUAR -> ${pausada.trabajo!.nombre} '
               'retoma en ${_screen.label}';
@@ -675,6 +710,14 @@ class St567Protocol implements SimulatorProtocol {
   void _iniciarTrabajo(St567Trabajo trabajo) {
     final St567Receta? receta = catalog.receta(trabajo.receta);
     _iniciarCarga(_Corrida.trabajo(trabajo, receta: receta!));
+  }
+
+  /// Retoma un trabajo pausado con lo que tenía al pausarse. La pantalla la
+  /// elige el que llama.
+  void _reanudar(_Corrida pausada) {
+    _corrida = pausada;
+    _parcial = pausada.parcialGuardado;
+    _segundosMezcla = pausada.segundosMezclaGuardados;
   }
 
   void _iniciarCarga(_Corrida corrida) {
@@ -903,6 +946,13 @@ class St567Protocol implements SimulatorProtocol {
       _pagina = 0;
     }
     _ticksEnPopup = 0;
+    _trasPopup = St567Screen.principal;
+  }
+
+  /// Muestra un popup sin botones que al cerrarse solo pasa a [despues].
+  void _popup(St567Screen popup, {St567Screen despues = St567Screen.principal}) {
+    _entrar(popup, mantenerPagina: true);
+    _trasPopup = despues;
   }
 
   /// Un paso de la animación de carga o descarga: [objetivo] se completa en
