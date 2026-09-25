@@ -156,6 +156,51 @@ void main() {
       expect(ind.pantalla, St567Screen.principal);
     });
 
+    test('con mezcla por ingrediente mezcla después de cada ACUM', () {
+      final _Indicador ind = _Indicador();
+      ind.protocolo
+          .setOptions(const St567Options(mezclaPorIngrediente: true));
+      ind.app('CTR,elegirReceta');
+      ind.app('CTR,select,1,1500');
+      ind.ticks(20);
+      ind.app('CTR,acum,Dario');
+
+      // Maiz mezcla 30 s y después sigue con Soja.
+      expect(ind.trama, '6,0,30\r\n');
+      ind.ticks(31);
+      expect(ind.trama, startsWith('38,600,0,300,Soja,0,0,0,'));
+
+      ind.ticks(20);
+      ind.app('CTR,acum,Dario');
+      ind.ticks(31);
+      ind.ticks(20);
+      ind.app('CTR,acum,Dario');
+
+      // El último ingrediente mezcla lo de la receta y termina.
+      expect(ind.trama, '6,0,30\r\n');
+      ind.ticks(31);
+      expect(ind.pantalla, St567Screen.principal);
+    });
+
+    test('ESC en la mezcla de un ingrediente pausa el trabajo en la carga', () {
+      final _Indicador ind = _Indicador();
+      ind.protocolo
+          .setOptions(const St567Options(mezclaPorIngrediente: true));
+      ind.app('CTR,elegirTrabajo');
+      ind.app('CTR,select,3');
+      ind.ticks(20);
+      ind.app('CTR,acum,Dario');
+      expect(ind.pantalla, St567Screen.mezclando);
+      ind.app('CTR,esc');
+      expect(ind.pantalla, St567Screen.principal);
+
+      ind.app('CTR,elegirTrabajo');
+      ind.app('CTR,select,3');
+      expect(ind.trama, '41\r\n');
+      ind.app('CTR,boton1');
+      expect(ind.trama, startsWith('38,1200,0,600,Silo,'));
+    });
+
     test('la cantidad pedida escala la receta', () {
       final _Indicador ind = _Indicador();
       ind.app('CTR,elegirReceta');
@@ -238,8 +283,9 @@ void main() {
 
       ind.app('CTR,descargaManual,L01,300');
       expect(ind.trama, '4,450,0,300,L01,0,0,0\r\n');
+      // El total es lo que tenía el mixer al empezar: no baja al descargar.
       ind.ticks(1);
-      expect(ind.trama, '4,435,15,300,L01,0,0,0\r\n');
+      expect(ind.trama, '4,450,15,300,L01,0,0,0\r\n');
 
       ind.app('CTR,acum');
       expect(ind.trama, '33\r\n');
@@ -248,8 +294,82 @@ void main() {
       // kg en 0: descarga sin objetivo, la app muestra lo descargado.
       ind.app('CTR,descargaManual,L02,0');
       ind.ticks(1);
-      expect(ind.trama, '4,385,50,0,L02,0,0,0\r\n');
+      expect(ind.trama, '4,450,50,0,L02,0,0,0\r\n');
       expect(ind.pesoMostrado, 50);
+    });
+
+    test('el total de la carga manual arranca de cero en cada entrada', () {
+      final _Indicador ind = _Indicador();
+      ind.app('CTR,cargaManual');
+      ind.app('CTR,select,3,500');
+      ind.ticks(20);
+      ind.app('CTR,acum,Dario');
+      ind.app('CTR,select,1,300');
+      ind.ticks(1);
+      expect(ind.trama, '2,515,15,300,1,Maiz,0,0,0\r\n');
+      ind.app('CTR,esc');
+      ind.app('CTR,esc');
+
+      ind.app('CTR,cargaManual');
+      ind.app('CTR,select,2,100');
+      ind.ticks(1);
+      expect(ind.trama, '2,5,5,100,2,Soja,0,0,0\r\n');
+      expect(ind.estado.totalCargado, 500);
+    });
+
+    test('ESC en la lista de ingredientes vuelve a la carga si se abrió desde '
+        'ahí', () {
+      final _Indicador ind = _Indicador();
+      ind.app('CTR,cargaManual');
+      ind.app('CTR,select,1,500');
+      ind.ticks(3);
+      ind.app('CTR,selectIngrediente');
+      ind.app('CTR,esc');
+      expect(ind.trama, '2,75,75,500,1,Maiz,0,0,0\r\n');
+
+      // Recién entrado desde la principal, el ESC sale.
+      ind.app('CTR,esc');
+      ind.app('CTR,cargaManual');
+      ind.app('CTR,esc');
+      expect(ind.pantalla, St567Screen.principal);
+    });
+
+    test('elegir otro ingrediente descarta lo pesado sin ACUM', () {
+      final _Indicador ind = _Indicador();
+      ind.app('CTR,cargaManual');
+      ind.app('CTR,select,1,500');
+      ind.ticks(3);
+      ind.app('CTR,selectIngrediente');
+      ind.app('CTR,select,2,200');
+      expect(ind.trama, '2,0,0,200,2,Soja,0,0,0\r\n');
+    });
+
+    test('sin lista de ingredientes va directo a la 2 vacía', () {
+      final _Indicador ind = _Indicador();
+      ind.protocolo
+          .setOptions(const St567Options(sinListaIngredientes: true));
+      ind.app('CTR,cargaManual');
+      ind.ticks(3);
+      expect(ind.trama, '2,0,0,0,,,0,0,0\r\n');
+      expect(ind.app('CTR,selectIngrediente'), contains('se ignora'));
+
+      ind.app('CTR,acum,Dario');
+      expect(ind.pantalla, St567Screen.principal);
+    });
+
+    test('ACUM con el mixer vacío termina la descarga manual', () {
+      final _Indicador ind = _Indicador();
+      ind.app('CTR,cargaManual');
+      ind.app('CTR,select,3,300');
+      ind.ticks(20);
+      ind.app('CTR,acum,Dario');
+      ind.app('CTR,esc');
+
+      ind.app('CTR,descargaManual,L01,300');
+      ind.ticks(20);
+      ind.app('CTR,acum');
+      expect(ind.pantalla, St567Screen.principal);
+      expect(ind.logs.last, contains('el mixer quedó vacío'));
     });
 
     test('no descarga más de lo que hay en el mixer', () {
@@ -300,23 +420,22 @@ void main() {
       expect(ind.pantalla, St567Screen.mezclando);
       ind.ticks(21);
 
+      // El total de la 39 es lo descargado de la guía, no lo que queda.
       expect(
         ind.trama,
-        '39,800,0,500,Corral 3,0,0,0,3,Corral 3,0,500,Corral 4,0,300,'
+        '39,0,0,500,Corral 3,0,0,0,3,Corral 3,0,500,Corral 4,0,300,'
         'Corral 5,0,200\r\n',
       );
       ind.ticks(20);
-      expect(ind.trama, startsWith('39,300,500,500,Corral 3,0,0,1,3,'
+      expect(ind.trama, startsWith('39,500,500,500,Corral 3,0,0,1,3,'
           'Corral 3,500,500,'));
       ind.app('CTR,acum,Dario');
-      ind.ticks(20);
-      ind.app('CTR,acum,Dario');
 
-      // 800 kg cargados, 800 descargados y todavía falta Corral 5.
+      // Quedan 300 kg en el mixer y faltan 500 para la guía.
       expect(ind.trama, '40\r\n');
-      expect(ind.estado.totalCargado, 0);
+      expect(ind.estado.totalCargado, 300);
 
-      // NUEVA: otra carga de la receta por los 200 kg que faltan.
+      // NUEVA: otra carga de la receta por los 200 kg que no alcanzan.
       ind.app('CTR,boton2');
       expect(ind.trama, startsWith('38,0,0,100,Maiz,0,0,0,3,Maiz,100,'));
       for (int i = 0; i < 3; i++) {
@@ -324,7 +443,10 @@ void main() {
         ind.app('CTR,acum,Dario');
       }
       ind.ticks(21);
-      expect(ind.trama, startsWith('39,200,0,200,Corral 5,'));
+      expect(ind.trama, startsWith('39,500,0,300,Corral 4,'));
+      ind.ticks(20);
+      ind.app('CTR,acum,Dario');
+      expect(ind.trama, startsWith('39,800,0,200,Corral 5,'));
       ind.ticks(20);
       ind.app('CTR,acum,Dario');
 
@@ -344,12 +466,19 @@ void main() {
       }
       ind.ticks(21 + 20);
       ind.app('CTR,acum,Dario');
+      expect(ind.pantalla, St567Screen.masCarga);
+
+      // CONTINUAR descarga lo que hay; no vuelve a avisar hasta que el mixer
+      // se vacía.
+      ind.app('CTR,boton1');
       ind.ticks(20);
+      expect(ind.trama, startsWith('39,800,300,300,Corral 4,'));
       ind.app('CTR,acum,Dario');
+      expect(ind.pantalla, St567Screen.masCarga);
 
       ind.app('CTR,boton1');
       ind.ticks(5);
-      expect(ind.trama, startsWith('39,0,0,200,Corral 5,'));
+      expect(ind.trama, startsWith('39,800,0,200,Corral 5,'));
       ind.app('CTR,acum,Dario');
       expect(ind.pantalla, St567Screen.principal);
     });
@@ -389,7 +518,7 @@ void main() {
       expect(ind.pantalla, St567Screen.mezclando);
 
       ind.app('CTR,esc');
-      expect(ind.trama, startsWith('39,2000,0,1200,Corral 6,'));
+      expect(ind.trama, startsWith('39,0,0,1200,Corral 6,'));
     });
 
     test('un trabajo abandonado en la descarga avisa con el 17 y sigue '
@@ -404,7 +533,7 @@ void main() {
       ind.ticks(46 + 20);
       ind.app('CTR,acum,Dario');
       ind.ticks(4);
-      expect(ind.trama, startsWith('39,640,160,800,Corral 7,'));
+      expect(ind.trama, startsWith('39,1360,160,800,Corral 7,'));
       ind.app('CTR,esc');
       expect(ind.pantalla, St567Screen.principal);
 
@@ -416,7 +545,7 @@ void main() {
       expect(ind.app('CTR,esc'), contains('se ignora'));
       ind.ticks(St567Protocol.ticksPopup);
       expect(ind.logs.last, contains('popup 17 -> 39'));
-      expect(ind.trama, startsWith('39,640,160,800,Corral 7,'));
+      expect(ind.trama, startsWith('39,1360,160,800,Corral 7,'));
     });
 
     test('sin operario, elegir un trabajo muestra el 16 y vuelve a la lista',

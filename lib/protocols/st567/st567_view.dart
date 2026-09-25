@@ -134,6 +134,28 @@ class St567View extends StatelessWidget {
                   options.copyWith(sinOperario: v),
                 ),
               ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('Mezcla por ingrediente'),
+                subtitle: const Text(
+                  'en la carga por receta mezcla (6) después de cada ACUM',
+                ),
+                value: options.mezclaPorIngrediente,
+                onChanged: (bool v) => controller.setSt567Options(
+                  options.copyWith(mezclaPorIngrediente: v),
+                ),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('Sin lista de ingredientes'),
+                subtitle: const Text('cargaManual va directo a la 2 vacía'),
+                value: options.sinListaIngredientes,
+                onChanged: (bool v) => controller.setSt567Options(
+                  options.copyWith(sinListaIngredientes: v),
+                ),
+              ),
             ],
           ),
         ),

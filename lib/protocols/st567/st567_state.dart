@@ -8,6 +8,8 @@ class St567Options {
     this.sincronizacionFalla = false,
     this.sinTrabajos = false,
     this.sinOperario = false,
+    this.mezclaPorIngrediente = false,
+    this.sinListaIngredientes = false,
   });
 
   /// Firmware ≥ 1.36.3: `CTR,elegirReceta` responde `60` (con preset) en vez
@@ -25,17 +27,30 @@ class St567Options {
   /// elige en la tablet (`42`) no le llega: la app lo valida localmente.
   final bool sinOperario;
 
+  /// Después del ACUM de cada ingrediente de una receta (menos el último) el
+  /// indicador mezcla los segundos de ese ingrediente (`6`) antes de pasar al
+  /// siguiente. Apagado, sólo mezcla al final, con los de la receta.
+  final bool mezclaPorIngrediente;
+
+  /// El indicador no tiene lista de ingredientes: `CTR,cargaManual` va
+  /// directo a la `2` vacía, sin pasar por la `32`.
+  final bool sinListaIngredientes;
+
   St567Options copyWith({
     bool? recetasConPreset,
     bool? sincronizacionFalla,
     bool? sinTrabajos,
     bool? sinOperario,
+    bool? mezclaPorIngrediente,
+    bool? sinListaIngredientes,
   }) {
     return St567Options(
       recetasConPreset: recetasConPreset ?? this.recetasConPreset,
       sincronizacionFalla: sincronizacionFalla ?? this.sincronizacionFalla,
       sinTrabajos: sinTrabajos ?? this.sinTrabajos,
       sinOperario: sinOperario ?? this.sinOperario,
+      mezclaPorIngrediente: mezclaPorIngrediente ?? this.mezclaPorIngrediente,
+      sinListaIngredientes: sinListaIngredientes ?? this.sinListaIngredientes,
     );
   }
 }
