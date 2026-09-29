@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:test_jaguar/domain/entities/scale_measurement.dart';
-import 'package:test_jaguar/protocols/st567/st567_command.dart';
+import 'package:test_jaguar/protocols/shared/ctr_command.dart';
 import 'package:test_jaguar/protocols/st567/st567_protocol.dart';
 import 'package:test_jaguar/protocols/st567/st567_screen.dart';
 import 'package:test_jaguar/protocols/st567/st567_state.dart';
@@ -17,7 +17,7 @@ class _Indicador {
 
   /// Lo que la app manda. Devuelve el log del comando.
   String app(String comando) {
-    final String log = protocolo.apply(St567Command.tryParse(comando)!);
+    final String log = protocolo.apply(CtrCommand.tryParse(comando)!);
     logs.add(log);
     return log;
   }

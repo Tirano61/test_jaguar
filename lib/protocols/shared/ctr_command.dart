@@ -1,12 +1,14 @@
-/// Un comando `CTR,<nombre>[,<arg>…]` que la app manda al ST567 por la
-/// característica de escritura (`docs/protocolo-simulador-st567.md`, sección 4).
+/// Un comando `CTR,<nombre>[,<arg>…]` que la app de los remotos nuevos (ST567,
+/// ST456web) manda al indicador por la característica de escritura
+/// (sección 4 de `docs/protocolo-simulador-st567.md` y
+/// `docs/protocolo-simulador-st456web.md`).
 ///
 /// Es otra gramática que la de los `AT+`: distingue mayúsculas en los
 /// argumentos (nombres de operario, lotes) y los espacios son parte del valor,
 /// así que no puede pasar por la normalización que usa el orquestador para
 /// esos comandos.
-class St567Command {
-  const St567Command(this.nombre, [this.args = const <String>[]]);
+class CtrCommand {
+  const CtrCommand(this.nombre, [this.args = const <String>[]]);
 
   /// El comando tal como lo escribe la app (`levelLock`, `cargaManual`…).
   final String nombre;
@@ -24,7 +26,7 @@ class St567Command {
   /// [received] viene con los caracteres de control escapados por el
   /// datasource (`\r`, `\n`, `\s` por el espacio, `\\`, `\xNN`), así que
   /// primero se deshace ese escapado.
-  static St567Command? tryParse(String received) {
+  static CtrCommand? tryParse(String received) {
     final String texto = _unescape(received).trim();
     final List<String> partes = texto.split(',');
     if (partes.length < 2 || partes.first.toUpperCase() != 'CTR') {
@@ -34,7 +36,7 @@ class St567Command {
     if (nombre.isEmpty) {
       return null;
     }
-    return St567Command(nombre, partes.sublist(2));
+    return CtrCommand(nombre, partes.sublist(2));
   }
 
   static String _unescape(String input) {

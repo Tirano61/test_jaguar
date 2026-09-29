@@ -4,9 +4,9 @@ import 'package:test_jaguar/core/constants/ble_constants.dart';
 import 'package:test_jaguar/core/constants/payload_framing.dart';
 import 'package:test_jaguar/domain/entities/scale_measurement.dart';
 import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
+import 'package:test_jaguar/protocols/shared/ctr_command.dart';
 import 'package:test_jaguar/protocols/simulator_protocol.dart';
 import 'package:test_jaguar/protocols/st567/st567_catalog.dart';
-import 'package:test_jaguar/protocols/st567/st567_command.dart';
 import 'package:test_jaguar/protocols/st567/st567_payload.dart';
 import 'package:test_jaguar/protocols/st567/st567_screen.dart';
 import 'package:test_jaguar/protocols/st567/st567_state.dart';
@@ -328,7 +328,7 @@ class St567Protocol implements SimulatorProtocol {
   /// Procesa un comando de la app y devuelve la línea de log. Un comando que
   /// no corresponde a la pantalla vigente no cambia nada, pero se loguea
   /// igual: es justamente lo que el tester necesita ver.
-  String apply(St567Command command) {
+  String apply(CtrCommand command) {
     final String nombre = command.nombre.toLowerCase();
     final String? log = switch (nombre) {
       'sync' => _sync(),
@@ -415,7 +415,7 @@ class St567Protocol implements SimulatorProtocol {
     return 'Comando aplicado -> ${St567Screen.elegirIngrediente.label}';
   }
 
-  String? _descargaManual(St567Command command) {
+  String? _descargaManual(CtrCommand command) {
     if (_screen != St567Screen.principal &&
         _screen != St567Screen.loteYCantidad) {
       return null;
@@ -543,7 +543,7 @@ class St567Protocol implements SimulatorProtocol {
     }
   }
 
-  String? _select(St567Command command) {
+  String? _select(CtrCommand command) {
     final String indice = command.arg(0);
     switch (_screen) {
       case St567Screen.elegirReceta:
@@ -622,7 +622,7 @@ class St567Protocol implements SimulatorProtocol {
     return 'Comando aplicado -> ${St567Screen.elegirIngrediente.label}';
   }
 
-  String? _acum(St567Command command) {
+  String? _acum(CtrCommand command) {
     final String operario = command.arg(0);
     final String quien = operario.isEmpty ? 'sin operario' : 'operario $operario';
 
