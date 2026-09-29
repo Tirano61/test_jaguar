@@ -13,6 +13,7 @@ import 'package:test_jaguar/application/use_cases/set_hydraulic_peso_use_case.da
 import 'package:test_jaguar/application/use_cases/set_manual_measurement_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_send_protocol_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_st407_screen_use_case.dart';
+import 'package:test_jaguar/application/use_cases/set_st456web_screen_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_st567_options_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_st567_screen_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_toma_fuerza_rpm_use_case.dart';
@@ -72,6 +73,7 @@ class AppBootstrap {
       setHydraulicPesoUseCase: SetHydraulicPesoUseCase(orchestrator),
       setSt567ScreenUseCase: SetSt567ScreenUseCase(orchestrator),
       setSt567OptionsUseCase: SetSt567OptionsUseCase(orchestrator),
+      setSt456webScreenUseCase: SetSt456webScreenUseCase(orchestrator),
     );
 
     runApp(_AppRoot(

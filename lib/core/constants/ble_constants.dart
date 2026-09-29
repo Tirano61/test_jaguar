@@ -9,7 +9,7 @@ class BleConstants {
         writeUuid: '0000ABF2-0000-1000-8000-00805F9B34FB',
     );
 
-    /// Perfil remoto ABF3: lo comparten el ST407, el ST567 y el futuro
+    /// Perfil remoto ABF3: lo comparten el ST407, el ST567 y el
     /// ST456web. Es un perfil GATT, no un protocolo — el protocolo lo define el
     /// formato de las tramas, no estos UUIDs.
     static const BleUuids remotoAbf3 = BleUuids(

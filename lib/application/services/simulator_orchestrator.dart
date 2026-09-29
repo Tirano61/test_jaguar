@@ -17,6 +17,8 @@ import 'package:test_jaguar/protocols/shared/scale_automatisms.dart';
 import 'package:test_jaguar/protocols/simulator_protocol.dart';
 import 'package:test_jaguar/protocols/st407_remote/st407_remote_protocol.dart';
 import 'package:test_jaguar/protocols/st407_remote/st407_screen.dart';
+import 'package:test_jaguar/protocols/st456web/st456web_protocol.dart';
+import 'package:test_jaguar/protocols/st456web/st456web_screen.dart';
 import 'package:test_jaguar/protocols/st567/st567_protocol.dart';
 import 'package:test_jaguar/protocols/st567/st567_screen.dart';
 import 'package:test_jaguar/protocols/st567/st567_state.dart';
@@ -63,6 +65,11 @@ class SimulatorOrchestrator {
   /// la UI con otro protocolo activo.
   St567Protocol get _st567 =>
       _registry.of(SendProtocol.st567) as St567Protocol;
+
+  /// El módulo Remoto ST456web. Como el ST567, la pantalla se puede elegir
+  /// desde la UI con otro protocolo activo.
+  St456webProtocol get _st456web =>
+      _registry.of(SendProtocol.st456web) as St456webProtocol;
 
   /// Congelado de peso y estabilidad. Una sola instancia compartida: el peso
   /// que congela sale del último emitido globalmente, no del protocolo activo.
@@ -125,6 +132,10 @@ class SimulatorOrchestrator {
       _st567.resetRunState();
     }
 
+    if (_sendProtocol != SendProtocol.st456web) {
+      _st456web.resetRunState();
+    }
+
     // Limpiar estado de ejecución hidráulico si ya no estamos en ese
     // protocolo (tomaFuerza/errorEcu se conservan, son configuración, no
     // estado de una corrida en curso).
@@ -137,6 +148,7 @@ class SimulatorOrchestrator {
       bleUuids: _protocol.bleUuids,
       hidraulico: _hydraulic.state,
       st567: _st567.state,
+      st456web: _st456web.state,
     ));
     _pushLog('Protocolo seleccionado: ${protocol.label}');
     await _sendCurrentPayloadNow();
@@ -215,6 +227,19 @@ class SimulatorOrchestrator {
     _pushLog(log);
 
     if (_sendProtocol == SendProtocol.st567) {
+      await _sendCurrentPayloadNow();
+    }
+  }
+
+  Future<void> setSt456webScreen(St456webScreen screen) async {
+    final String? log = _st456web.goTo(screen);
+    if (log == null) {
+      return;
+    }
+    _emit(_current.copyWith(st456web: _st456web.state));
+    _pushLog(log);
+
+    if (_sendProtocol == SendProtocol.st456web) {
       await _sendCurrentPayloadNow();
     }
   }
@@ -436,6 +461,7 @@ class SimulatorOrchestrator {
         manualMeasurement: _manual.measurement,
         hidraulico: _hydraulic.state,
         st567: _st567.state,
+        st456web: _st456web.state,
         weightHoldSecondsRemaining: weightHoldSecondsRemaining,
         lastJson: payload,
       ),
@@ -462,6 +488,11 @@ class SimulatorOrchestrator {
     // muestra el peso del motor tal cual, y la estabilidad la deduce el módulo.
     if (_sendProtocol == SendProtocol.st567) {
       return _st567.advance(base, log: _pushLog);
+    }
+
+    // El ST456web tampoco: el peso de su principal es el del motor.
+    if (_sendProtocol == SendProtocol.st456web) {
+      return _st456web.advance(base, log: _pushLog);
     }
 
     // En las pantallas de carga del ST407 el peso lo anima el protocolo.
