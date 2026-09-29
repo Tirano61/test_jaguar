@@ -12,11 +12,11 @@ import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_movement_command.
 import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_protocol.dart';
 import 'package:test_jaguar/protocols/manual/manual_protocol.dart';
 import 'package:test_jaguar/protocols/protocol_registry.dart';
+import 'package:test_jaguar/protocols/shared/ctr_command.dart';
 import 'package:test_jaguar/protocols/shared/scale_automatisms.dart';
 import 'package:test_jaguar/protocols/simulator_protocol.dart';
 import 'package:test_jaguar/protocols/st407_remote/st407_remote_protocol.dart';
 import 'package:test_jaguar/protocols/st407_remote/st407_screen.dart';
-import 'package:test_jaguar/protocols/st567/st567_command.dart';
 import 'package:test_jaguar/protocols/st567/st567_protocol.dart';
 import 'package:test_jaguar/protocols/st567/st567_screen.dart';
 import 'package:test_jaguar/protocols/st567/st567_state.dart';
@@ -491,7 +491,7 @@ class SimulatorOrchestrator {
     // Los CTR, del ST567 van antes de normalizar: la normalización de los AT+
     // pasa todo a mayúsculas y borra los espacios, y en los CTR, los
     // argumentos (operario, lote) valen tal cual llegan.
-    final St567Command? ctr = St567Command.tryParse(command);
+    final CtrCommand? ctr = CtrCommand.tryParse(command);
     if (ctr != null) {
       if (_sendProtocol == SendProtocol.st567) {
         await _applySt567Command(_st567.apply(ctr));
