@@ -18,6 +18,9 @@ explica más abajo.
 
 ## Los tres pasos
 
+Los ejemplos usan el ST456web, que se sumó siguiendo estos pasos: su carpeta
+`lib/protocols/st456web/` es un caso completo para mirar.
+
 ### 1. Sumar el valor al enum
 
 `lib/domain/value_objects/send_protocol.dart`:
@@ -136,15 +139,17 @@ if (_isMiComando(normalizedCommand)) {
 Es la gramática de los indicadores remotos nuevos (ST567, ST456web). No pasa
 por la cadena de `AT+`: esa normalización pasa todo a mayúsculas y borra los
 espacios, y en los `CTR,` los argumentos (nombre de operario, lote) valen tal
-cual llegan. El orquestador los intercepta **antes** de normalizar.
+cual llegan. El orquestador los intercepta **antes** de normalizar y se los pasa al
+remoto activo: sumá tu protocolo al `switch` de `_applyIncomingCommandIfNeeded`
+y al mensaje que se loguea cuando no hay ningún remoto activo.
 
-El ST567 ya lo resuelve y sirve de modelo:
+El ST567 y el ST456web ya lo resuelven y sirven de modelo:
 
 * `CtrCommand.tryParse` (`lib/protocols/shared/ctr_command.dart`) separa
   nombre y argumentos y deshace el escapado que aplica el datasource (`\s`
   por el espacio, `\r`, `\n`, `\`, `\xNN`). Es compartido: el protocolo nuevo
   recibe el `CtrCommand` ya armado.
-* `St567Protocol.apply` es la máquina de estados: recibe el comando, decide la
+* `St567Protocol.apply` (o `St456webProtocol.apply`) es la máquina de estados: recibe el comando, decide la
   pantalla que sigue según la pantalla vigente y devuelve la línea de log. Un
   comando que no corresponde a la pantalla se loguea y no cambia nada.
 * `St567Protocol.advance` es el reloj: anima carga y descarga, corre la cuenta
@@ -152,7 +157,7 @@ El ST567 ya lo resuelve y sirve de modelo:
 
 Sobre el ritmo de envío: los documentos piden repetir la pantalla cada
 **200–500 ms**, pero el motor tiene un tick de **1 segundo**
-(`SimulationTiming.oneMinutePerPhase`) y el ST567 lo usa tal cual. La app no
+(`SimulationTiming.oneMinutePerPhase`) y los dos remotos lo usan tal cual. La app no
 tiene timeout de datos, así que alcanza; si hiciera falta más fluidez, hay que
 hacer el tick configurable por protocolo.
 

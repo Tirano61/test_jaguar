@@ -17,11 +17,12 @@ void main() {
     expect(registry.all, hasLength(SendProtocol.values.length));
   });
 
-  test('sólo los remotos ST407 y ST567 usan el perfil ABF3 y cabecera de 5 '
-      'bytes', () {
+  test('sólo los remotos ST407, ST567 y ST456web usan el perfil ABF3 y '
+      'cabecera de 5 bytes', () {
     for (final SendProtocol id in <SendProtocol>[
       SendProtocol.st407Remote,
       SendProtocol.st567,
+      SendProtocol.st456web,
     ]) {
       expect(registry.of(id).bleUuids, same(BleConstants.remotoAbf3),
           reason: '$id comparte el perfil del ST407');

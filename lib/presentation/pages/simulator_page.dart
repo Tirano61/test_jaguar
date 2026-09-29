@@ -5,6 +5,7 @@ import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_view.dart';
 import 'package:test_jaguar/protocols/jaguar_ble/jaguar_ble_view.dart';
 import 'package:test_jaguar/protocols/manual/manual_view.dart';
 import 'package:test_jaguar/protocols/st407_remote/st407_remote_view.dart';
+import 'package:test_jaguar/protocols/st456web/st456web_view.dart';
 import 'package:test_jaguar/protocols/st567/st567_view.dart';
 
 /// Rutea a la pantalla del protocolo seleccionado.
@@ -36,6 +37,8 @@ class SimulatorPage extends StatelessWidget {
             return HydraulicView(controller: controller);
           case SendProtocol.st567:
             return St567View(controller: controller);
+          case SendProtocol.st456web:
+            return St456webView(controller: controller);
         }
       },
     );
