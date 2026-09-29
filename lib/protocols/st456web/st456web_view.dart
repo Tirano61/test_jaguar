@@ -8,8 +8,8 @@ import 'package:test_jaguar/protocols/st456web/st456web_screen.dart';
 import 'package:test_jaguar/protocols/st456web/st456web_state.dart';
 
 /// Pantalla del modo Remoto ST456web: muestra en qué pantalla está el
-/// indicador simulado y deja saltar a las que no necesitan una corrida en
-/// curso.
+/// indicador simulado y qué está haciendo, deja saltar a las pantallas que no
+/// necesitan una corrida en curso y fija cómo responde a algunos comandos.
 ///
 /// La navegación real la hace la app con sus `CTR,<comando>`; esto es para
 /// forzar casos (un popup, un diálogo) sin tener que llegar a ellos.
@@ -23,6 +23,7 @@ class St456webView extends StatelessWidget {
     final SimulatorViewState state = controller.state;
     final St456webState st456web = state.st456web;
     final St456webScreen actual = st456web.screen;
+    final St456webOptions options = st456web.options;
 
     return SimulatorScaffold(
       controller: controller,
@@ -38,6 +39,18 @@ class St456webView extends StatelessWidget {
               Text(
                 'Notificando: ${actual.label}',
                 style: Theme.of(context).textTheme.titleMedium,
+              ),
+              if (st456web.detalle.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 4),
+                Text(st456web.detalle),
+              ],
+              const SizedBox(height: 4),
+              Text(
+                'Mixer: ${st456web.totalCargado} kg · '
+                'Operario: ${st456web.operario.isEmpty ? '-' : st456web.operario}'
+                '${st456web.descargaPendiente.isEmpty ? '' : ' · Descarga '
+                    'pendiente: ${st456web.descargaPendiente}'}',
+                style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 8),
               DropdownButtonFormField<St456webScreen>(
@@ -76,12 +89,54 @@ class St456webView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 4),
+        SectionCard(
+          title: 'Respuestas del indicador',
+          child: Column(
+            children: <Widget>[
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('La sincronización falla'),
+                subtitle: const Text('sync termina en 35 en vez de 36'),
+                value: options.sincronizacionFalla,
+                onChanged: (bool v) => controller.setSt456webOptions(
+                  options.copyWith(sincronizacionFalla: v),
+                ),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('Sin trabajos cargados'),
+                subtitle: const Text('elegirTrabajo responde el popup 20'),
+                value: options.sinTrabajos,
+                onChanged: (bool v) => controller.setSt456webOptions(
+                  options.copyWith(sinTrabajos: v),
+                ),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('Indicador sin operario'),
+                subtitle: const Text(
+                  'arrancar una receta o elegir un trabajo responde el '
+                  'popup 16',
+                ),
+                value: options.sinOperario,
+                onChanged: (bool v) => controller.setSt456webOptions(
+                  options.copyWith(sinOperario: v),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
         HeroWeightCard(
           weight: state.weight,
           footer: Text(
             'Protocolo ST456web (remoto): cabecera binaria de 5 bytes y cadena '
             'separada por coma, sobre el mismo perfil ABF3 que el ST407 y el '
-            'ST567.',
+            'ST567. En las pantallas de peso se muestra lo que falta cargar o '
+            'descargar, como en la app.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Colors.white.withValues(alpha: 0.90),
                 ),

@@ -20,6 +20,7 @@ rearma el advertising con el perfil GATT que corresponda.
 | **Manual** | Balanza con los valores fijados a mano desde la UI. Los automatismos están apagados | JSON de 7 claves | ABF0 / ABF6 |
 | **Hidráulico BLE** | Caja de manejo de tubo y guillotina, con descarga automática | JSON de 7 claves + `tomaFuerza`, `rpm`, `errorEcu`, `tubo` y `gillo` | ABF0 / ABF6 |
 | **Remoto ST567** | Indicador remoto que responde a la app: listas de recetas, ingredientes y trabajos, carga y descarga animadas, mezcla y sincronización (pantallas 0-60) | Cadena separada por coma, con cabecera binaria de 5 bytes | ABF3 |
+| **Remoto ST456web** | Indicador remoto original: receta con cantidad, autónomos, guías y trabajos de tipo RECE/GUIA/AUTO, carga y descarga animadas, mezcla y sincronización (pantallas 0-20, 35, 36 y 42-45) | Cadena separada por coma, con cabecera binaria de 5 bytes | ABF3 |
 
 ## Cómo se usa
 
@@ -42,7 +43,7 @@ Llegan por *characteristic write* desde la app conectada.
 | `AT+DETENER` / `AT+REANUDAR` | Hidráulico | Pausa y retoma la descarga |
 | `AT+FINALIZAR` | Hidráulico | Corta la descarga sin guardar |
 | `AT+MOVIMIENTO=<tipo>` | Hidráulico | Abre y cierra tubo o guillotina |
-| `CTR,<comando>[,<arg>…]` | Remoto ST567 | Los comandos de la app remota (`sync`, `elegirReceta`, `select`, `acum`, `esc`…); ver [docs/protocolo-simulador-st567.md](docs/protocolo-simulador-st567.md) |
+| `CTR,<comando>[,<arg>…]` | Remoto ST567 y Remoto ST456web | Los comandos de la app remota (`sync`, `elegirReceta`, `select`, `acum`, `esc`…); los procesa el remoto activo. Ver [docs/protocolo-simulador-st567.md](docs/protocolo-simulador-st567.md) y [docs/protocolo-simulador-st456web.md](docs/protocolo-simulador-st456web.md) |
 
 Y notifica `AT+GUARDAR` (o `AT+GUARDARDOS` en el modo dos descargas) cuando una
 descarga hidráulica llega a su objetivo.
@@ -85,6 +86,7 @@ lib/
     manual/
     hidraulico_ble/
     st567/
+    st456web/
     shared/               lo que comparten dos o más protocolos
     simulator_protocol.dart   el contrato
     protocol_registry.dart

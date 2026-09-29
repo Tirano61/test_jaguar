@@ -10,6 +10,7 @@ import 'package:test_jaguar/application/use_cases/set_humidity_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_hydraulic_peso_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_send_protocol_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_st407_screen_use_case.dart';
+import 'package:test_jaguar/application/use_cases/set_st456web_options_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_st456web_screen_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_st567_options_use_case.dart';
 import 'package:test_jaguar/application/use_cases/set_st567_screen_use_case.dart';
@@ -22,6 +23,7 @@ import 'package:test_jaguar/domain/entities/scale_measurement.dart';
 import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
 import 'package:test_jaguar/protocols/st407_remote/st407_screen.dart';
 import 'package:test_jaguar/protocols/st456web/st456web_screen.dart';
+import 'package:test_jaguar/protocols/st456web/st456web_state.dart';
 import 'package:test_jaguar/protocols/st567/st567_screen.dart';
 import 'package:test_jaguar/protocols/st567/st567_state.dart';
 import 'package:test_jaguar/domain/value_objects/simulation_phase.dart';
@@ -44,6 +46,7 @@ class SimulatorController extends ChangeNotifier {
     required SetSt567ScreenUseCase setSt567ScreenUseCase,
     required SetSt567OptionsUseCase setSt567OptionsUseCase,
     required SetSt456webScreenUseCase setSt456webScreenUseCase,
+    required SetSt456webOptionsUseCase setSt456webOptionsUseCase,
   })  : _startSimulationUseCase = startSimulationUseCase,
         _stopSimulationUseCase = stopSimulationUseCase,
         _observeStatusUseCase = observeStatusUseCase,
@@ -58,7 +61,8 @@ class SimulatorController extends ChangeNotifier {
         _setHydraulicPesoUseCase = setHydraulicPesoUseCase,
         _setSt567ScreenUseCase = setSt567ScreenUseCase,
         _setSt567OptionsUseCase = setSt567OptionsUseCase,
-        _setSt456webScreenUseCase = setSt456webScreenUseCase {
+        _setSt456webScreenUseCase = setSt456webScreenUseCase,
+        _setSt456webOptionsUseCase = setSt456webOptionsUseCase {
     _bind();
   }
 
@@ -77,6 +81,7 @@ class SimulatorController extends ChangeNotifier {
   final SetSt567ScreenUseCase _setSt567ScreenUseCase;
   final SetSt567OptionsUseCase _setSt567OptionsUseCase;
   final SetSt456webScreenUseCase _setSt456webScreenUseCase;
+  final SetSt456webOptionsUseCase _setSt456webOptionsUseCase;
 
   StreamSubscription<SimulatorStatusDto>? _statusSubscription;
 
@@ -120,6 +125,9 @@ class SimulatorController extends ChangeNotifier {
 
   Future<void> selectSt456webScreen(St456webScreen screen) =>
       _setSt456webScreenUseCase(screen);
+
+  Future<void> setSt456webOptions(St456webOptions options) =>
+      _setSt456webOptionsUseCase(options);
 
   Future<void> setManualTara(double value) =>
       _updateManualMeasurement(tara: value.round().clamp(0, 22000));

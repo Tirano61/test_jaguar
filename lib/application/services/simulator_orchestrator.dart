@@ -19,6 +19,7 @@ import 'package:test_jaguar/protocols/st407_remote/st407_remote_protocol.dart';
 import 'package:test_jaguar/protocols/st407_remote/st407_screen.dart';
 import 'package:test_jaguar/protocols/st456web/st456web_protocol.dart';
 import 'package:test_jaguar/protocols/st456web/st456web_screen.dart';
+import 'package:test_jaguar/protocols/st456web/st456web_state.dart';
 import 'package:test_jaguar/protocols/st567/st567_protocol.dart';
 import 'package:test_jaguar/protocols/st567/st567_screen.dart';
 import 'package:test_jaguar/protocols/st567/st567_state.dart';
@@ -244,6 +245,21 @@ class SimulatorOrchestrator {
     }
   }
 
+  /// Como las del ST567: se guardan aunque el protocolo activo sea otro y no
+  /// reenvían nada.
+  Future<void> setSt456webOptions(St456webOptions options) async {
+    _pushLog(_st456web.setOptions(options));
+    _emit(_current.copyWith(st456web: _st456web.state));
+  }
+
+  /// Publica el resultado de un comando `CTR,` del ST456web, con el mismo
+  /// criterio que [_applySt567Command].
+  Future<void> _applySt456webCommand(String log) async {
+    _emit(_current.copyWith(st456web: _st456web.state));
+    _pushLog(log);
+    await _sendCurrentPayloadNow();
+  }
+
   /// Las opciones son configuración: se guardan aunque el protocolo activo
   /// sea otro. No reenvían nada porque sólo cambian cómo se responde a los
   /// próximos comandos, no la pantalla vigente.
@@ -431,6 +447,11 @@ class SimulatorOrchestrator {
       measurement = _st567.outgoing(
         _current.measurement.copyWith(humedad: _selectedHumidity),
       );
+    } else if (_sendProtocol == SendProtocol.st456web) {
+      // Igual que el ST567.
+      measurement = _st456web.outgoing(
+        _current.measurement.copyWith(humedad: _selectedHumidity),
+      );
     } else {
       measurement = _current.measurement.copyWith(humedad: _selectedHumidity);
     }
@@ -490,7 +511,7 @@ class SimulatorOrchestrator {
       return _st567.advance(base, log: _pushLog);
     }
 
-    // El ST456web tampoco: el peso de su principal es el del motor.
+    // El ST456web tampoco, por lo mismo.
     if (_sendProtocol == SendProtocol.st456web) {
       return _st456web.advance(base, log: _pushLog);
     }
@@ -519,18 +540,21 @@ class SimulatorOrchestrator {
       return;
     }
 
-    // Los CTR, del ST567 van antes de normalizar: la normalización de los AT+
-    // pasa todo a mayúsculas y borra los espacios, y en los CTR, los
-    // argumentos (operario, lote) valen tal cual llegan.
+    // Los CTR, de los remotos nuevos van antes de normalizar: la
+    // normalización de los AT+ pasa todo a mayúsculas y borra los espacios,
+    // y en los CTR, los argumentos (operario, lote) valen tal cual llegan.
     final CtrCommand? ctr = CtrCommand.tryParse(command);
     if (ctr != null) {
-      if (_sendProtocol == SendProtocol.st567) {
-        await _applySt567Command(_st567.apply(ctr));
-      } else {
-        _pushLog(
-          '${ctr.texto} recibido pero se ignora: seleccioná "Remoto ST567" '
-          'para procesarlo.',
-        );
+      switch (_sendProtocol) {
+        case SendProtocol.st567:
+          await _applySt567Command(_st567.apply(ctr));
+        case SendProtocol.st456web:
+          await _applySt456webCommand(_st456web.apply(ctr));
+        default:
+          _pushLog(
+            '${ctr.texto} recibido pero se ignora: seleccioná "Remoto ST567" '
+            'o "Remoto ST456web" para procesarlo.',
+          );
       }
       return;
     }
