@@ -5,6 +5,7 @@ import 'package:test_jaguar/domain/value_objects/send_protocol.dart';
 import 'package:test_jaguar/domain/value_objects/simulation_phase.dart';
 import 'package:test_jaguar/protocols/hidraulico_ble/hydraulic_state.dart';
 import 'package:test_jaguar/protocols/st407_remote/st407_screen.dart';
+import 'package:test_jaguar/protocols/st456web/st456web_state.dart';
 import 'package:test_jaguar/protocols/st567/st567_state.dart';
 
 /// Foto del simulador que el orquestador publica en cada emisión.
@@ -27,6 +28,7 @@ class SimulatorStatusDto {
     required this.manualMeasurement,
     required this.hidraulico,
     required this.st567,
+    required this.st456web,
   });
 
   // --- Comunes ---
@@ -61,6 +63,9 @@ class SimulatorStatusDto {
   /// Remoto ST567: pantalla, opciones y lo que está haciendo el indicador.
   final St567State st567;
 
+  /// Remoto ST456web: pantalla y lo que está haciendo el indicador.
+  final St456webState st456web;
+
   static const SimulatorStatusDto initial = SimulatorStatusDto(
     bleStatus: BlePeripheralStatus.initial,
     running: false,
@@ -75,6 +80,7 @@ class SimulatorStatusDto {
     manualMeasurement: ScaleMeasurement.baseline,
     hidraulico: HydraulicState.initial,
     st567: St567State.initial,
+    st456web: St456webState.initial,
   );
 
   SimulatorStatusDto copyWith({
@@ -91,6 +97,7 @@ class SimulatorStatusDto {
     ScaleMeasurement? manualMeasurement,
     HydraulicState? hidraulico,
     St567State? st567,
+    St456webState? st456web,
   }) {
     return SimulatorStatusDto(
       bleStatus: bleStatus ?? this.bleStatus,
@@ -107,6 +114,7 @@ class SimulatorStatusDto {
       manualMeasurement: manualMeasurement ?? this.manualMeasurement,
       hidraulico: hidraulico ?? this.hidraulico,
       st567: st567 ?? this.st567,
+      st456web: st456web ?? this.st456web,
     );
   }
 }
