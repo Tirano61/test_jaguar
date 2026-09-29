@@ -140,10 +140,10 @@ cual llegan. El orquestador los intercepta **antes** de normalizar.
 
 El ST567 ya lo resuelve y sirve de modelo:
 
-* `St567Command.tryParse` (`lib/protocols/st567/st567_command.dart`) separa
+* `CtrCommand.tryParse` (`lib/protocols/shared/ctr_command.dart`) separa
   nombre y argumentos y deshace el escapado que aplica el datasource (`\s`
-  por el espacio, `\r`, `\n`, `\`, `\xNN`). Si el ST456web necesita lo mismo,
-  conviene moverlo a `protocols/shared/` en vez de copiarlo.
+  por el espacio, `\r`, `\n`, `\`, `\xNN`). Es compartido: el protocolo nuevo
+  recibe el `CtrCommand` ya armado.
 * `St567Protocol.apply` es la máquina de estados: recibe el comando, decide la
   pantalla que sigue según la pantalla vigente y devuelve la línea de log. Un
   comando que no corresponde a la pantalla se loguea y no cambia nada.
