@@ -19,6 +19,12 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
+dependency_overrides:
+  # Copia parcheada del plugin Android: setName ya no queda colgado cuando el
+  # adaptador ya tiene el nombre pedido. Ver packages/README.md.
+  bluetooth_low_energy_android:
+    path: packages/bluetooth_low_energy_android
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
